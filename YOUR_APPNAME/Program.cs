@@ -66,6 +66,7 @@ namespace YOUR_APPNAME
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine("  exit: exit - exits the program");
+                    Console.WriteLine("  hello: hello - greets you");
                     Console.WriteLine("  help: help - shows this help message");
                     break;
                 default:

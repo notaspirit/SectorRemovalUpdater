@@ -13,3 +13,6 @@ Simple template to get started with a custom C# app using WolvenKits Nuget Packa
 ### Get Started Using
 - In the directory with the built `.exe` run `YOUR_APPNAME.exe help` to get a list of commands, `YOUR_APPNAME.exe start {EXE GAME PATH} {ENABLE MODS true : false (optional, default false)}` will start the interactive mode which has it's own set of commands with access to WolvenKits functionality.
 - To make your app a global command you will need to add the directory to the PATH variables
+
+## Additional Tips
+- For a simple multithreading solution build an array or list of Task<> and use Task.WhenAll() to wait for their completion

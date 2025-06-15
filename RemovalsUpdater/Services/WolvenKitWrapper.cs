@@ -7,7 +7,7 @@ using WolvenKit.Core.Services;
 using WolvenKit.RED4.CR2W;
 using WolvenKit.RED4.CR2W.Archive;
 
-namespace YOUR_APPNAME.Services;
+namespace RemovalsUpdater.Services;
 
 public class WolvenKitWrapper
 {

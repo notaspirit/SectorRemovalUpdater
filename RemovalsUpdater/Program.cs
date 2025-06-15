@@ -1,9 +1,7 @@
-﻿using System;
-using System.CommandLine.Parsing;
-using System.Linq;
-using YOUR_APPNAME.Services;
+﻿using System.CommandLine.Parsing;
+using RemovalsUpdater.Services;
 
-namespace YOUR_APPNAME
+namespace RemovalsUpdater
 {
     class Program
     {
@@ -94,7 +92,7 @@ namespace YOUR_APPNAME
             if (args.Length == 0)
             {
                 Console.WriteLine("Error: No command provided.");
-                Console.WriteLine("Usage: YOUR_APPNAME.exe <command>");
+                Console.WriteLine("Usage: RemovalsUpdater.exe <command>");
                 return;
             }
             
@@ -128,7 +126,7 @@ namespace YOUR_APPNAME
                     break;
                 default:
                     Console.WriteLine($"Error: Unknown command '{command}'.");
-                    Console.WriteLine("Type 'YOUR_APPNAME.exe help' for a list of available commands.");
+                    Console.WriteLine("Type 'RemovalsUpdater.exe help' for a list of available commands.");
                     break;
             }
         }

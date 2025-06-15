@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <ServerGarbageCollection>true</ServerGarbageCollection>
+        <RootNamespace>YOUR_APPNAME</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

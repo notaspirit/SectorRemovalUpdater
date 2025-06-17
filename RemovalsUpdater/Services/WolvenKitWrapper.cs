@@ -22,10 +22,14 @@ public class WolvenKitWrapper
     public ArchiveManager ArchiveManager;
     public GeometryCacheService GeometryCacheService;
     
+    public string GameExePath { get; set; }
+    
     private WolvenKitWrapper(string gameExePath, bool enableMods = false)
     {
         if (string.IsNullOrEmpty(gameExePath)) throw new ArgumentNullException(nameof(gameExePath), "Game executable path cannot be null or empty.");
         if (!File.Exists(gameExePath)) throw new FileNotFoundException("Game executable path cannot be found.");
+        
+        GameExePath = gameExePath;
         
         _loggerService = new SerilogWrapper();
         _progressService = new ProgressService<double>();
@@ -63,7 +67,7 @@ public class WolvenKitWrapper
     /// Get the current Instance
     /// </summary>
     /// <exception cref="ArgumentException">if wrapper is not initialized</exception>
-    public static WolvenKitWrapper Instance
+    public static WolvenKitWrapper? Instance
     {
         get
         {

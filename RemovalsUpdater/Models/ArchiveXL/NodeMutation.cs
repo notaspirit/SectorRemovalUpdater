@@ -15,12 +15,4 @@ public class NodeMutation : BaseNode
 
     [JsonProperty("nbNodesUnderProxyDiff")]
     public int? NbNodesUnderProxyDiff { get; set; }
-    
-    public NodeMutation()
-    {
-        Position = new float[4];
-        Orientation = new float[4];
-        Scale = new float[3];
-        NbNodesUnderProxyDiff = 0;
-    }
 }

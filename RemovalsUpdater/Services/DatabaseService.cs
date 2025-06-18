@@ -38,8 +38,7 @@ public class DatabaseService
         
             var tx = _env.BeginTransaction();
             _sectorDb = tx.OpenDatabase("Sectors", new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
-            var code = tx.Commit();
-            Console.WriteLine(code.ToString());
+            tx.Commit();
             _isInitailized = true;
         }
         catch (Exception e)
@@ -50,7 +49,6 @@ public class DatabaseService
 
     public void WriteEntry(byte[] key, byte[] value)
     {
-        Console.WriteLine($"DB is initialized: {_isInitailized}");
         if (!_isInitailized)
             return;
         using var tx = _env.BeginTransaction();

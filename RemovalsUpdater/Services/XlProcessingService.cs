@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RemovalsUpdater.JsonConverters;
 using RemovalsUpdater.Models.ArchiveXL;
 using RemovalsUpdater.Models.RemovalsUpdater;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace RemovalsUpdater.Services;
 
@@ -18,6 +19,7 @@ public class XlProcessingService
     private static JsonSerializerSettings joptions = new JsonSerializerSettings()
     {
         Formatting = Formatting.Indented,
+        NullValueHandling = NullValueHandling.Ignore,
         Converters = { new NodeRemovalConverter() }
     };
     
@@ -56,7 +58,7 @@ public class XlProcessingService
 
             UtilService.Shuffle(newHashes);
             
-            var newSector = sectors.FirstOrDefault(s => s.Path == sector.Path);
+            var newSector = outSectors.FirstOrDefault(s => s.Path == sector.Path);
 
             if (newSector == null)
             {
@@ -71,7 +73,8 @@ public class XlProcessingService
                 outSectors.Add(newSector);
             }
 
-            Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes = new();
+            Dictionary<NodeRemoval, NodeDataEntry> unresolvedRemovals = new();
+            Dictionary<NodeMutation, NodeDataEntry> unresolvedMutations = new();
             
             foreach (var node in sector.NodeDeletions)
             {
@@ -85,22 +88,41 @@ public class XlProcessingService
                         goto continueOuter; 
                 }
                 
-                unresolvedNodes.Add(node, oldHash);
+                unresolvedRemovals.Add(node, oldHash);
                 
                 continueOuter:
                 continue;
             }
             
-            ResolveUnResolvedNodes(ref outSectors, unresolvedNodes, sector.Path);
+            foreach (var node in sector.NodeMutations)
+            {
+                var oldHash = oldHashes[node.Index];
+                if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
+                    continue;
+                
+                foreach (var newHash in newHashes)
+                {
+                    if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
+                        goto continueOuter; 
+                }
+                
+                unresolvedMutations.Add(node, oldHash);
+                
+                continueOuter:
+                continue;
+            }
+            
+            ResolveUnResolvedNodes(ref outSectors, unresolvedRemovals, unresolvedMutations, sector.Path);
         }
         
         return outSectors;
     }
 
     private void ResolveUnResolvedNodes(ref List<Sector> sectors,
-        Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes, string sectorPath)
+        Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes,
+        Dictionary<NodeMutation, NodeDataEntry> unresolvedMutations, string sectorPath)
     {
-        if (unresolvedNodes.Count == 0)
+        if (unresolvedNodes.Count + unresolvedMutations.Count == 0)
             return;
         
         var sectorInfo = GetSectorInfo(sectorPath);
@@ -117,8 +139,10 @@ public class XlProcessingService
                     var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sector);
                     foreach (var newHash in newHashes)
                     {
-                        var match = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
-                        if (match == null)
+                        var matchRemoval = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
+                        var matchMutation = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
+                        
+                        if (matchRemoval == null && matchMutation == null)
                             continue;
                         
                         var interatedSectorInfo = new SectorInfo()
@@ -129,9 +153,13 @@ public class XlProcessingService
                             LOD = sectorInfo.LOD
                         };
                         
-                        var node = unresolvedNodes.First(n => n.Value == match).Key;
-
-                        unresolvedNodes.Remove(node);
+                        var nodeRemoval = unresolvedNodes.FirstOrDefault(n => n.Value == matchRemoval).Key;
+                        var nodeMutation = unresolvedMutations.FirstOrDefault(n => n.Value == matchMutation).Key;
+                        
+                        if (nodeRemoval != null)
+                            unresolvedNodes.Remove(nodeRemoval);
+                        if (nodeMutation != null)
+                            unresolvedMutations.Remove(nodeMutation);
 
                         var newSector = sectors.FirstOrDefault(s => s.Path == GetSectorPath(sectorPath, interatedSectorInfo));
 
@@ -147,9 +175,12 @@ public class XlProcessingService
                             sectors.Add(newSector);
                         }
 
-                        ProcessNode(node, match, newHash, newHashes.IndexOf(newHash), ref newSector);
-                            
-                        if (unresolvedNodes.Count == 0)
+                        if (nodeRemoval != null && matchRemoval != null)
+                            ProcessNode(nodeRemoval, matchRemoval, newHash, newHashes.IndexOf(newHash), ref newSector);
+                        if (nodeMutation != null && matchMutation != null)
+                            ProcessNode(nodeMutation, matchMutation, newHash, newHashes.IndexOf(newHash), ref newSector);    
+                        
+                        if (unresolvedNodes.Count + unresolvedMutations.Count == 0)
                             return;
                     }
                 }
@@ -161,14 +192,15 @@ public class XlProcessingService
     {
         if (!CompareHashes(oldHash, newHash))
             return false;
-        // Console.WriteLine($"{oldHash.ActorHashes.Length} {newHashes[node.Index].ActorHashes.Length} {node.GetType()}");
+        
+        var oldNodeIndex = node.Index;
+        node.Index = newHashIndex;
+        
         if (oldHash.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
         {
             AddNode(node, ref sector);
             return true;
         }
-        var oldNodeIndex = node.Index;
-        node.Index = newHashIndex;
         
         inr.ExpectedActors = newHash.ActorHashes!.Length;
         var relevantIndicies = oldHash.ActorHashes
@@ -262,7 +294,7 @@ public class XlProcessingService
     private static void WriteJson(JObject json, List<Sector> sectors, string outputPath)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException());
-        json["streaming"]["sectors"] = JArray.FromObject(sectors);
-        File.WriteAllText(outputPath, json.ToString());
+        json["streaming"]["sectors"] = JArray.FromObject(sectors, JsonSerializer.Create(joptions));
+        File.WriteAllText(outputPath, JsonConvert.SerializeObject(json, joptions));
     }
 }

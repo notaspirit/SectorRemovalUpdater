@@ -56,65 +56,33 @@ public class XlProcessingService
 
             UtilService.Shuffle(newHashes);
             
-            var newSector = new Sector
+            var newSector = sectors.FirstOrDefault(s => s.Path == sector.Path);
+
+            if (newSector == null)
             {
-                ExpectedNodes = newHashes.Length,
-                Path = sector.Path,
-                NodeDeletions = new List<NodeRemoval>(),
-                NodeMutations = new List<NodeMutation>()
-            };
-            
-            outSectors.Add(newSector);
-            
+                newSector = new Sector
+                {
+                    ExpectedNodes = newHashes.Length,
+                    Path = sector.Path,
+                    NodeDeletions = new List<NodeRemoval>(),
+                    NodeMutations = new List<NodeMutation>()
+                };
+
+                outSectors.Add(newSector);
+            }
+
             Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes = new();
             
             foreach (var node in sector.NodeDeletions)
             {
                 var oldHash = oldHashes[node.Index];
-                if (CompareHashes(oldHash, newHashes[node.Index]))
-                {
-                    // Console.WriteLine($"{oldHash.ActorHashes.Length} {newHashes[node.Index].ActorHashes.Length} {node.GetType()}");
-                    if (oldHash.ActorHashes == null || newHashes[node.Index].ActorHashes == null || node is not InstancedNodeRemoval inr)
-                    {
-                        newSector.NodeDeletions.Add(node);
-                        continue;
-                    }
-                    
-                    inr.ExpectedActors = newHashes[node.Index].ActorHashes!.Length;
-                    var relevantIndicies = oldHash.ActorHashes
-                        .Select((h, i) => new { Index = i, Hash = h })
-                        .Where(x => inr.ActorDeletions.Contains(x.Index))
-                        .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
-                        .ToList();
-                    inr.ActorDeletions = MatchActors(relevantIndicies, newHashes[node.Index].ActorHashes!.ToList(), sector.Path, node.Index);
-                    
-                    newSector.NodeDeletions.Add(inr);
+                if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
                     continue;
-                }
                 
                 foreach (var newHash in newHashes)
                 {
-                    if (!CompareHashes(oldHash, newHash))
-                        continue;
-                    
-                    node.Index = newHashes.IndexOf(newHash);
-                    
-                    if (oldHash.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
-                    {
-                        newSector.NodeDeletions.Add(node);
-                        goto continueOuter;
-                    }
-
-                    inr.ExpectedActors = newHash.ActorHashes!.Length;
-                    var relevantIndicies = oldHash.ActorHashes
-                        .Select((h, i) => new { Index = i, Hash = h })
-                        .Where(x => inr.ActorDeletions.Contains(x.Index))
-                        .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
-                        .ToList();
-                    inr.ActorDeletions = MatchActors(relevantIndicies, newHash.ActorHashes!.ToList(), sector.Path, node.Index);
-                    
-                    newSector.NodeDeletions.Add(inr);
-                    goto continueOuter;
+                    if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
+                        goto continueOuter; 
                 }
                 
                 unresolvedNodes.Add(node, oldHash);
@@ -164,9 +132,6 @@ public class XlProcessingService
                         var node = unresolvedNodes.First(n => n.Value == match).Key;
 
                         unresolvedNodes.Remove(node);
-                        
-                        var originalIndex = node.Index;
-                        node.Index = newHashes.IndexOf(newHash);
 
                         var newSector = sectors.FirstOrDefault(s => s.Path == GetSectorPath(sectorPath, interatedSectorInfo));
 
@@ -181,31 +146,58 @@ public class XlProcessingService
                             };
                             sectors.Add(newSector);
                         }
-                        
-                        if (match.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
-                        {
-                            newSector.NodeDeletions.Add(node);
-                            if (unresolvedNodes.Count == 0)
-                                return;
-                            continue;
-                        }
 
-                        inr.ExpectedActors = newHash.ActorHashes!.Length;
-                        var oldActors = match.ActorHashes
-                            .Select((h, i) => new { Index = i, Hash = h })
-                            .Where(x => inr.ActorDeletions.Contains(x.Index))
-                            .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
-                            .ToList();
-
-                        inr.ActorDeletions = MatchActors(oldActors, newHash.ActorHashes!.ToList(), sectorPath, originalIndex);
-                    
-                        newSector.NodeDeletions.Add(inr);
+                        ProcessNode(node, match, newHash, newHashes.IndexOf(newHash), ref newSector);
+                            
                         if (unresolvedNodes.Count == 0)
                             return;
                     }
                 }
         Console.WriteLine($"Could not resolve {unresolvedNodes.Count} nodes in {sectorPath} and neighboring sectors.");
         Console.WriteLine($"Unresolved nodeData Indices are: { string.Join(", ", unresolvedNodes.Keys.Select(x => x.Index).ToList())}");
+    }
+    
+    private static bool ProcessNode(BaseNode node, NodeDataEntry oldHash, NodeDataEntry newHash, int newHashIndex, ref Sector sector)
+    {
+        if (!CompareHashes(oldHash, newHash))
+            return false;
+        // Console.WriteLine($"{oldHash.ActorHashes.Length} {newHashes[node.Index].ActorHashes.Length} {node.GetType()}");
+        if (oldHash.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
+        {
+            AddNode(node, ref sector);
+            return true;
+        }
+        var oldNodeIndex = node.Index;
+        node.Index = newHashIndex;
+        
+        inr.ExpectedActors = newHash.ActorHashes!.Length;
+        var relevantIndicies = oldHash.ActorHashes
+            .Select((h, i) => new { Index = i, Hash = h })
+            .Where(x => inr.ActorDeletions.Contains(x.Index))
+            .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
+            .ToList();
+        inr.ActorDeletions = MatchActors(relevantIndicies, newHash.ActorHashes!.ToList(), sector.Path, oldNodeIndex);
+                    
+        AddNode(node, ref sector);
+        return true;
+    }
+
+    private static void AddNode(BaseNode node, ref Sector sector)
+    {
+        switch (node)
+        {
+            case InstancedNodeRemoval inr:
+                sector.NodeDeletions.Add(inr);
+                break;
+            case NodeRemoval nr:
+                sector.NodeDeletions.Add(nr);
+                break;
+            case NodeMutation nm:
+                sector.NodeMutations.Add(nm);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(node), node, null);
+        }
     }
 
     private static string GetSectorPath(string oldPath, SectorInfo sectorInfo)

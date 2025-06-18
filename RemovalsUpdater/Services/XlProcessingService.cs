@@ -54,6 +54,8 @@ public class XlProcessingService
             var oldHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
             var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
 
+            UtilService.Shuffle(newHashes);
+            
             var newSector = new Sector
             {
                 ExpectedNodes = newHashes.Length,
@@ -79,12 +81,17 @@ public class XlProcessingService
                     }
                     
                     inr.ExpectedActors = newHashes[node.Index].ActorHashes!.Length;
-                    inr.ActorDeletions = MatchActors(oldHash.ActorHashes.Where(h => inr.ActorDeletions.Contains(oldHash.ActorHashes.IndexOf(h))).ToList(), newHashes[node.Index].ActorHashes!.ToList(), sector.Path, node.Index);
+                    var relevantIndicies = oldHash.ActorHashes
+                        .Select((h, i) => new { Index = i, Hash = h })
+                        .Where(x => inr.ActorDeletions.Contains(x.Index))
+                        .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
+                        .ToList();
+                    inr.ActorDeletions = MatchActors(relevantIndicies, newHashes[node.Index].ActorHashes!.ToList(), sector.Path, node.Index);
                     
                     newSector.NodeDeletions.Add(inr);
                     continue;
                 }
-
+                
                 foreach (var newHash in newHashes)
                 {
                     if (!CompareHashes(oldHash, newHash))
@@ -92,14 +99,19 @@ public class XlProcessingService
                     
                     node.Index = newHashes.IndexOf(newHash);
                     
-                    if (oldHash.ActorHashes == null || newHashes[node.Index].ActorHashes == null || node is not InstancedNodeRemoval inr)
+                    if (oldHash.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
                     {
                         newSector.NodeDeletions.Add(node);
                         goto continueOuter;
                     }
 
-                    inr.ExpectedActors = newHashes[node.Index].ActorHashes!.Length;
-                    inr.ActorDeletions = MatchActors(oldHash.ActorHashes.Where(h => inr.ActorDeletions.Contains(oldHash.ActorHashes.IndexOf(h))).ToList(), newHashes[node.Index].ActorHashes!.ToList(), sector.Path, node.Index);
+                    inr.ExpectedActors = newHash.ActorHashes!.Length;
+                    var relevantIndicies = oldHash.ActorHashes
+                        .Select((h, i) => new { Index = i, Hash = h })
+                        .Where(x => inr.ActorDeletions.Contains(x.Index))
+                        .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
+                        .ToList();
+                    inr.ActorDeletions = MatchActors(relevantIndicies, newHash.ActorHashes!.ToList(), sector.Path, node.Index);
                     
                     newSector.NodeDeletions.Add(inr);
                     goto continueOuter;
@@ -120,6 +132,9 @@ public class XlProcessingService
     private void ResolveUnResolvedNodes(ref List<Sector> sectors,
         Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes, string sectorPath)
     {
+        if (unresolvedNodes.Count == 0)
+            return;
+        
         var sectorInfo = GetSectorInfo(sectorPath);
         foreach (var sectorX in UtilService.ClosestSteps(sectorInfo.X, _settingsService.MaxSectorDepth))
             foreach (var sectorY in UtilService.ClosestSteps(sectorInfo.Y, _settingsService.MaxSectorDepth))
@@ -137,7 +152,7 @@ public class XlProcessingService
                         var match = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
                         if (match == null)
                             continue;
-
+                        
                         var interatedSectorInfo = new SectorInfo()
                         {
                             X = sectorX,
@@ -147,7 +162,10 @@ public class XlProcessingService
                         };
                         
                         var node = unresolvedNodes.First(n => n.Value == match).Key;
+
+                        unresolvedNodes.Remove(node);
                         
+                        var originalIndex = node.Index;
                         node.Index = newHashes.IndexOf(newHash);
 
                         var newSector = sectors.FirstOrDefault(s => s.Path == GetSectorPath(sectorPath, interatedSectorInfo));
@@ -164,18 +182,30 @@ public class XlProcessingService
                             sectors.Add(newSector);
                         }
                         
-                        if (match.ActorHashes == null || newHashes[node.Index].ActorHashes == null || node is not InstancedNodeRemoval inr)
+                        if (match.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
                         {
                             newSector.NodeDeletions.Add(node);
+                            if (unresolvedNodes.Count == 0)
+                                return;
                             continue;
                         }
 
-                        inr.ExpectedActors = newHashes[node.Index].ActorHashes!.Length;
-                        inr.ActorDeletions = MatchActors(match.ActorHashes.Where(h => inr.ActorDeletions.Contains(match.ActorHashes.IndexOf(h))).ToList(), newHashes[node.Index].ActorHashes!.ToList(), GetSectorPath(sectorPath, interatedSectorInfo), node.Index);
+                        inr.ExpectedActors = newHash.ActorHashes!.Length;
+                        var oldActors = match.ActorHashes
+                            .Select((h, i) => new { Index = i, Hash = h })
+                            .Where(x => inr.ActorDeletions.Contains(x.Index))
+                            .Select(x => new KeyValuePair<int, ulong>(x.Index, x.Hash))
+                            .ToList();
+
+                        inr.ActorDeletions = MatchActors(oldActors, newHash.ActorHashes!.ToList(), sectorPath, originalIndex);
                     
                         newSector.NodeDeletions.Add(inr);
+                        if (unresolvedNodes.Count == 0)
+                            return;
                     }
                 }
+        Console.WriteLine($"Could not resolve {unresolvedNodes.Count} nodes in {sectorPath} and neighboring sectors.");
+        Console.WriteLine($"Unresolved nodeData Indices are: { string.Join(", ", unresolvedNodes.Keys.Select(x => x.Index).ToList())}");
     }
 
     private static string GetSectorPath(string oldPath, SectorInfo sectorInfo)
@@ -196,15 +226,15 @@ public class XlProcessingService
         };
     }
     
-    private static List<int> MatchActors(List<ulong> oldHashes, List<ulong> newHash, string sectorPath, int nodeIndex)
+    private static List<int> MatchActors(List<KeyValuePair<int,ulong>> oldHashes, List<ulong> newHash, string sectorPath, int nodeIndex)
     {
         List<int> matchedActors = new();
         foreach (var oldActor in oldHashes)
         {
-            var index = newHash.IndexOf(oldActor);
+            var index = newHash.IndexOf(oldActor.Value);
             if (index == -1)
             {
-                Console.WriteLine($"Actor {oldHashes.IndexOf(oldActor)} not found in {sectorPath} node {nodeIndex}!");
+                Console.WriteLine($"No matching actor found for {oldActor.Key} in {sectorPath} at index {nodeIndex}!");
                 continue;
             }
             matchedActors.Add(index);
@@ -214,7 +244,12 @@ public class XlProcessingService
     
     private static bool CompareHashes(NodeDataEntry oldHash, NodeDataEntry newHash)
     {
-        return oldHash.NodeType == newHash.NodeType && oldHash.Hash == newHash.Hash;
+        // Checking actor hashes as well since instanced nodes are often identical apart from their actors, however this will miss instanced nodes where the actors have changed
+        var oldActorHashes = oldHash.ActorHashes ?? new ulong[0];
+        var newActorHashes = newHash.ActorHashes ?? new ulong[0];
+        if (oldActorHashes.Length != newActorHashes.Length)
+            return false;
+        return oldHash.NodeType == newHash.NodeType && oldHash.Hash == newHash.Hash && oldActorHashes.All(oldActor => newActorHashes.Contains(oldActor));
     }
     
     private static (JObject, List<Sector>) GetJsonElements(string xlFilePath)

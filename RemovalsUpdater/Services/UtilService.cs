@@ -25,4 +25,19 @@ public static class UtilService
             }
         }
     }
+    
+    private static readonly Random _random = new Random();
+    public static void Shuffle<T>(T[] array)
+    {
+        if (array == null)
+            throw new ArgumentNullException(nameof(array));
+            
+        for (int i = array.Length - 1; i > 0; i--)
+        {
+            int j = _random.Next(0, i + 1);
+            
+            // Swap elements at positions i and j
+            (array[i], array[j]) = (array[j], array[i]);
+        }
+    }
 }

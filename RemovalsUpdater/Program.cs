@@ -240,6 +240,15 @@ namespace RemovalsUpdater
                             break;
                     }
                     break;
+                case "update":
+                    if (args.Length < 3)
+                    {
+                        Console.WriteLine("update command requires 2 arguments: <path> <outPath>");
+                        return;
+                    }
+                    
+                    
+                    break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine(" start - Starts the interactive mode");

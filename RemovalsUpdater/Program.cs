@@ -240,14 +240,15 @@ namespace RemovalsUpdater
                             break;
                     }
                     break;
-                case "update":
+                case "updateRemoval":
                     if (args.Length < 3)
                     {
                         Console.WriteLine("update command requires 2 arguments: <path> <outPath>");
                         return;
                     }
-                    
-                    
+
+                    var ps = new XlProcessingService();
+                    ps.Process(args[1], args[2]);
                     break;
                 case "help":
                     Console.WriteLine("Available commands:");

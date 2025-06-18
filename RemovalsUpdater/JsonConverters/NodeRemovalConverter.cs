@@ -17,16 +17,34 @@ public class NodeRemovalConverter: JsonConverter<NodeRemoval>
     {
         var obj = JObject.Load(reader);
         
+        var expectedActors = obj["expectedActors"]?.Value<int?>();
+        var actorDeletionsToken = obj["actorDeletions"];
+        var expectedInstances = obj["expectedInstances"]?.Value<int?>();
+        var instanceDeletionsToken = obj["instanceDeletions"];
+        
+        List<int>? actorDeletions = actorDeletionsToken is JArray actorArray
+            ? actorArray.ToObject<List<int>>()
+            : null;
+
+        List<int>? instanceDeletions = instanceDeletionsToken is JArray instanceArray
+            ? instanceArray.ToObject<List<int>>()
+            : null;
+
         NodeRemoval removal;
-        if ((obj["expectedActors"]?.Value<int>() != null && (obj["actorDeletions"] is JArray actorArray ? actorArray.ToObject<List<int>>() : null) != null) ||
-            (obj["expectedInstances"]?.Value<int>() != null && (obj["instanceDeletions"] is JArray instanceArray ? instanceArray.ToObject<List<int>>() : null) != null))
+        
+        if ((expectedActors != null && actorDeletions != null) ||
+            (expectedInstances != null && instanceDeletions != null))
+        {
             removal = new InstancedNodeRemoval
             {
-                ExpectedActors = obj["expectedActors"]?.Value<int>() ?? obj["expectedInstances"]?.Value<int>() ?? -1,
-                ActorDeletions = obj["actorDeletions"]?.Value<List<int>>() ?? obj["instanceDeletions"]?.Value<List<int>>() ?? new List<int>(),
+                ExpectedActors = expectedActors ?? expectedInstances ?? -1,
+                ActorDeletions = actorDeletions ?? instanceDeletions ?? new List<int>()
             };
+        }
         else
+        {
             removal = new NodeRemoval();
+        }
         
         try
         {

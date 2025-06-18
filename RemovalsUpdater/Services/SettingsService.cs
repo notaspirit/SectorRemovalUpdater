@@ -10,6 +10,7 @@ public class SettingsService
     public string GamePath { get; set; }
     
     public bool EnableMods { get; set; }
+    public int MaxSectorDepth { get; set; }
     
     [JsonIgnore]
     private static SettingsService? instance;
@@ -40,6 +41,7 @@ public class SettingsService
         DatabasePath = "";
         GamePath = "";
         EnableMods = false;
+        MaxSectorDepth = 10;
     }
     
     private void LoadSettings()
@@ -58,6 +60,7 @@ public class SettingsService
         DatabasePath = savedSettings.DatabasePath;
         GamePath = savedSettings.GamePath;
         EnableMods = savedSettings.EnableMods;
+        MaxSectorDepth = savedSettings.MaxSectorDepth;
     }
 
     public void SaveSettings()
@@ -74,6 +77,7 @@ public class SettingsService
             new("DatabasePath", DatabasePath),
             new("GamePath", GamePath),
             new("EnableMods", EnableMods.ToString()),
+            new("MaxSectorDepth", MaxSectorDepth.ToString())
         };
     }
 
@@ -94,7 +98,18 @@ public class SettingsService
                     Console.WriteLine("Failed to parse EnableMods value.");
                     break;
                 }
+                
                 EnableMods = enableMods;
+                break;
+            case "MaxSectorDepth":
+                var parsedInt = int.TryParse(value, out var maxSectorDepth);
+                if (!parsedInt)
+                {
+                    Console.WriteLine("Failed to parse MaxSectorDepth value.");
+                    break;
+                }
+
+                MaxSectorDepth = maxSectorDepth;
                 break;
             default:
                 Console.WriteLine($"Unknown setting '{key}'.");

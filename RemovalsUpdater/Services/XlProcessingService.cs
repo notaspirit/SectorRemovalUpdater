@@ -46,7 +46,7 @@ public class XlProcessingService
         {
             // TODO: Add logic to DBs to have multiple dbs
             // For testing add a method to scramble newHashes around (switch indexes, add some remove some etc.)
-            var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(sector.Path));
+            var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(sector.Path), Enums.DatabaseNames.OldHashes);
             if (sectorBytes == null)
             {
                 Console.WriteLine($"Failed to get sector {sector.Path}");
@@ -75,43 +75,49 @@ public class XlProcessingService
 
             Dictionary<NodeRemoval, NodeDataEntry> unresolvedRemovals = new();
             Dictionary<NodeMutation, NodeDataEntry> unresolvedMutations = new();
-            
-            foreach (var node in sector.NodeDeletions)
+
+            if (sector.NodeDeletions != null)
             {
-                var oldHash = oldHashes[node.Index];
-                if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
-                    continue;
-                
-                foreach (var newHash in newHashes)
+                foreach (var node in sector.NodeDeletions)
                 {
-                    if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
-                        goto continueOuter; 
+                    var oldHash = oldHashes[node.Index];
+                    if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
+                        continue;
+
+                    foreach (var newHash in newHashes)
+                    {
+                        if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
+                            goto continueOuter;
+                    }
+
+                    unresolvedRemovals.Add(node, oldHash);
+
+                    continueOuter:
+                    continue;
                 }
-                
-                unresolvedRemovals.Add(node, oldHash);
-                
-                continueOuter:
-                continue;
             }
-            
-            foreach (var node in sector.NodeMutations)
+
+            if (sector.NodeMutations != null)
             {
-                var oldHash = oldHashes[node.Index];
-                if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
-                    continue;
-                
-                foreach (var newHash in newHashes)
+                foreach (var node in sector.NodeMutations)
                 {
-                    if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
-                        goto continueOuter; 
+                    var oldHash = oldHashes[node.Index];
+                    if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
+                        continue;
+                
+                    foreach (var newHash in newHashes)
+                    {
+                        if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
+                            goto continueOuter; 
+                    }
+                
+                    unresolvedMutations.Add(node, oldHash);
+                
+                    continueOuter:
+                    continue;
                 }
-                
-                unresolvedMutations.Add(node, oldHash);
-                
-                continueOuter:
-                continue;
+
             }
-            
             ResolveUnResolvedNodes(ref outSectors, unresolvedRemovals, unresolvedMutations, sector.Path);
         }
         
@@ -130,7 +136,7 @@ public class XlProcessingService
             foreach (var sectorY in UtilService.ClosestSteps(sectorInfo.Y, _settingsService.MaxSectorDepth))
                 foreach (var sectorZ in UtilService.ClosestSteps(sectorInfo.Z, _settingsService.MaxSectorDepth))
                 {
-                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath));
+                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath), Enums.DatabaseNames.NewHashes);
                     if (sector == null)
                     {
                         Console.WriteLine($"Failed to get sector {sectorPath}");

@@ -105,9 +105,9 @@ namespace RemovalsUpdater
                     }
                     
                     var dataBuilder = new DataBuilder();
-                    dataBuilder.Initialize(commandArray[1]);
+                    dataBuilder.Initialize();
                     
-                    await dataBuilder.BuildDataSet();
+                    await dataBuilder.BuildDataSet(commandArray[1]);
                     break;
                 case "DataBaseStats":
                     if (commandArray.Length < 2)
@@ -116,7 +116,7 @@ namespace RemovalsUpdater
                         return;
                     }
                     DatabaseService.Instance.Initialize(commandArray[1]);
-                    var (size, entries) = DatabaseService.Instance.GetStats();
+                    var (size, entries) = DatabaseService.Instance.GetStats(Enums.DatabaseNames.OldHashes);
                     Console.WriteLine($"Database size: {size} bytes with {entries} entries.");
                     break;
                 case "DumpDB":
@@ -126,7 +126,7 @@ namespace RemovalsUpdater
                         return;
                     }
                     DatabaseService.Instance.Initialize(commandArray[1]);
-                    DatabaseService.Instance.DumpDB();
+                    DatabaseService.Instance.DumpDB(Enums.DatabaseNames.OldHashes);
                     break;
                 case "CheckCollision":
                     if (commandArray.Length < 2)
@@ -138,7 +138,7 @@ namespace RemovalsUpdater
 
                     var hashFrequency = new Dictionary<ulong, ushort>();
                     
-                    var sectors = DatabaseService.Instance.DumpDB()?.Select(s => s.Value);
+                    var sectors = DatabaseService.Instance.DumpDB(Enums.DatabaseNames.OldHashes)?.Select(s => s.Value);
 
                     for(int i = 0; i < sectors?.Count(); i++)
                     {

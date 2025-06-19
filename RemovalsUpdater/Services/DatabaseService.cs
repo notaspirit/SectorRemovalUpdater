@@ -9,7 +9,7 @@ namespace RemovalsUpdater.Services;
 public class DatabaseService
 {
     private static DatabaseService? _instance;
-    private LightningDatabase _sectorDb;
+    private LightningDatabase[] _databases = new LightningDatabase[2];
     private LightningEnvironment _env;
     private static readonly long Kb = 1024;
     private static readonly long Gb = Kb * Kb * Kb;
@@ -32,12 +32,15 @@ public class DatabaseService
             {
                 MaxReaders = MaxReaders,
                 MapSize = MapSize,
-                MaxDatabases = 1,
+                MaxDatabases = 2,
             };
             _env.Open();
         
             var tx = _env.BeginTransaction();
-            _sectorDb = tx.OpenDatabase("Sectors", new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+            foreach (var dbname in Enum.GetValues(typeof(Enums.DatabaseNames)))
+            {
+                _databases[(int)dbname] = tx.OpenDatabase(dbname.ToString(), new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+            }
             tx.Commit();
             _isInitailized = true;
         }
@@ -47,42 +50,45 @@ public class DatabaseService
         }
     }
 
-    public void WriteEntry(byte[] key, byte[] value)
+    public void WriteEntry(byte[] key, byte[] value, Enums.DatabaseNames dbn)
     {
         if (!_isInitailized)
             return;
         using var tx = _env.BeginTransaction();
-        var code = tx.Put(_sectorDb, key, value);
+        var db = _databases[(int)dbn];
+        var code = tx.Put(db, key, value);
         Console.WriteLine(code.ToString());
         tx.Commit();
     }
 
-    public byte[]? GetEntry(byte[] key)
+    public byte[]? GetEntry(byte[] key, Enums.DatabaseNames dbn)
     {
         if (!_isInitailized)
             return null;
         using var tx = _env.BeginTransaction();
-        return tx.Get(_sectorDb, key).value.CopyToNewArray();
+        var db = _databases[(int)dbn];
+        return tx.Get(db, key).value.CopyToNewArray();
     }
 
-    public (long, long) GetStats()
+    public (long, long) GetStats(Enums.DatabaseNames dbn)
     {
         if (!_isInitailized)
             return (0, 0);
+        var db = _databases[(int)dbn];
         using var tx = _env.BeginTransaction();
-        var size = _sectorDb.DatabaseStats.PageSize;
-        var entires = _sectorDb.DatabaseStats.Entries;
+        var size = db.DatabaseStats.PageSize;
+        var entires = db.DatabaseStats.Entries;
         
         return (size, entires);
     }
 
-    public List<KeyValuePair<string, byte[]>>? DumpDB()
+    public List<KeyValuePair<string, byte[]>>? DumpDB(Enums.DatabaseNames dbn)
     {
         if (!_isInitailized)
             return null;
-
+        var db = _databases[(int)dbn];
         using var tx = _env.BeginTransaction();
-        using var cursor = tx.CreateCursor(_sectorDb);
+        using var cursor = tx.CreateCursor(db);
         var i = 0;
         
         var output = new List<KeyValuePair<string, byte[]>>();

@@ -6,6 +6,7 @@ using RemovalsUpdater.Models.RemovalsUpdater;
 using WolvenKit.RED4.Archive.Buffer;
 using WolvenKit.RED4.Types;
 using XXHash3NET;
+using Enums = RemovalsUpdater.Models.RemovalsUpdater.Enums;
 
 namespace RemovalsUpdater.Services;
 
@@ -13,17 +14,24 @@ public class DataBuilder
 {
     private WolvenKitWrapper? _wkit;
     private DatabaseService _dbs;
-
-    public void Initialize(string databasePath)
+    private SettingsService _settings;
+    
+    public void Initialize()
     {
         _wkit = WolvenKitWrapper.Instance;
         _dbs = DatabaseService.Instance;
-        Directory.CreateDirectory(databasePath);
-        _dbs.Initialize(Path.Join(databasePath, GetGameVersion(_wkit.GameExePath)));
+        _settings = SettingsService.Instance;
+        Directory.CreateDirectory(_settings.DatabasePath);
+        _dbs.Initialize(_settings.DatabasePath);
     }
 
-    public async Task BuildDataSet()
+    public async Task BuildDataSet(string dbns)
     {
+        if (!Enum.TryParse(typeof(Enums.DatabaseNames), dbns, out var dbn) && dbn is not Enums.DatabaseNames)
+        {
+            throw new Exception($"Invalid database name: {dbns}");
+        }
+        
         Console.WriteLine("Starting build process...");
         
         if (_wkit == null)
@@ -32,7 +40,7 @@ public class DataBuilder
         var vanillaSectors = _wkit.ArchiveManager.GetGameArchives()
             .SelectMany(x =>
             x.Files.Values.Where(y => y.Extension == ".streamingsector")
-                .Select(y => y.FileName)).ToList();
+                .Select(y => y.FileName)).Distinct().ToList();
 
         Console.WriteLine($"Found {vanillaSectors.Count} vanilla sector files.");
         foreach (var vanillaSector in vanillaSectors)
@@ -52,7 +60,7 @@ public class DataBuilder
         */
         
         
-        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s)));
+        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, (Enums.DatabaseNames)dbn)));
         try
         {
             await Task.WhenAll(tasks);
@@ -64,11 +72,11 @@ public class DataBuilder
         Console.WriteLine("Finished build process.");
     }
 
-    private void ProcessSector(string sectorPath)
+    private void ProcessSector(string sectorPath, Enums.DatabaseNames dbn)
     {
         try
         {
-            if (_dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath)) is { Length: > 0 })
+            if (_dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath), dbn) is { Length: > 0 })
                 return;
 
             Console.WriteLine($"Getting {sectorPath}...");
@@ -89,7 +97,7 @@ public class DataBuilder
 
             // Console.WriteLine($"Serializing {sectorPath} which contains {outNodeData.Length} nodes...");
 
-            _dbs.WriteEntry(Encoding.UTF8.GetBytes(sectorPath), MessagePackSerializer.Serialize(outNodeData));
+            _dbs.WriteEntry(Encoding.UTF8.GetBytes(sectorPath), MessagePackSerializer.Serialize(outNodeData), dbn);
 
             Console.WriteLine($"Finished {sectorPath}.");
         }

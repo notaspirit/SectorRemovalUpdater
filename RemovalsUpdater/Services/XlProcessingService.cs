@@ -5,8 +5,12 @@ using MessagePack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RemovalsUpdater.JsonConverters;
+using RemovalsUpdater.YamlConverters;
 using RemovalsUpdater.Models.ArchiveXL;
 using RemovalsUpdater.Models.RemovalsUpdater;
+using YamlDotNet.RepresentationModel;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace RemovalsUpdater.Services;
@@ -20,8 +24,18 @@ public class XlProcessingService
     {
         Formatting = Formatting.Indented,
         NullValueHandling = NullValueHandling.Ignore,
-        Converters = { new NodeRemovalConverter() }
+        Converters = { new JsonConverters.NodeRemovalConverter() }
     };
+    
+    private static ISerializer yserializer = new SerializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .WithTypeConverter(new YamlConverters.NodeRemovalConverter())
+        .Build();
+    private static IDeserializer ydeserializer = new DeserializerBuilder()
+        .IgnoreUnmatchedProperties()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .WithTypeConverter(new YamlConverters.NodeRemovalConverter())
+        .Build();
     
     public XlProcessingService()
     {
@@ -33,9 +47,28 @@ public class XlProcessingService
     
     public void Process(string xlFilePath, string outputPath)
     {
-        var (json, sectors) = GetJsonElements(xlFilePath);
+        JObject? json = null;
+        YamlNode? yaml = null;
+        List<Sector>? sectors = null;
+        try
+        {
+            (json, sectors) = GetJsonElements(xlFilePath);
+        }
+        catch (Exception) { }
+        if (json == null || sectors == null)
+            try
+            {
+                (yaml, sectors) = GetYamlElements(xlFilePath);
+            }
+            catch (Exception e) { }
+        if (sectors == null)
+            throw new Exception("Failed to parse XL file.");
+        
         var pSectors = ProcessSectors(sectors);
-        WriteJson(json, pSectors, outputPath);
+        if (json != null)
+            WriteJson(json, pSectors, outputPath);
+        if (yaml != null)
+            WriteYaml(yaml, pSectors, outputPath);
     }
 
     private List<Sector> ProcessSectors(List<Sector> sectors)
@@ -44,8 +77,7 @@ public class XlProcessingService
 
         foreach (var sector in sectors)
         {
-            // TODO: Add logic to DBs to have multiple dbs
-            // For testing add a method to scramble newHashes around (switch indexes, add some remove some etc.)
+            // TODO: Remove shuffling for production build, change target db for newHashes
             var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(sector.Path), Enums.DatabaseNames.OldHashes);
             if (sectorBytes == null)
             {
@@ -55,7 +87,7 @@ public class XlProcessingService
             
             var oldHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
             var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
-
+            
             UtilService.Shuffle(newHashes);
             
             var newSector = outSectors.FirstOrDefault(s => s.Path == sector.Path);
@@ -302,5 +334,51 @@ public class XlProcessingService
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException());
         json["streaming"]["sectors"] = JArray.FromObject(sectors, JsonSerializer.Create(joptions));
         File.WriteAllText(outputPath, JsonConvert.SerializeObject(json, joptions));
+    }
+    
+    private static (YamlNode, List<Sector>) GetYamlElements(string yamlFilePath)
+    {
+        if (!File.Exists(yamlFilePath))
+            throw new FileNotFoundException("File not found.");
+    
+        var fileContent = File.ReadAllText(yamlFilePath);
+        
+        var yaml = new YamlStream();
+        using (var reader = new StringReader(fileContent))
+        {
+            yaml.Load(reader);
+        }
+        var yamlDocument = yaml.Documents[0].RootNode;
+        
+        var xl = ydeserializer.Deserialize<ArchiveXLFile>(fileContent);
+    
+        if (xl == null)
+            throw new Exception("Failed to deserialize ArchiveXLFile");
+    
+        return (yamlDocument, xl.Streaming.Sectors);
+    }
+    
+    private static void WriteYaml(YamlNode yaml, List<Sector> sectors, string outputPath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException());
+        
+        var yamlMapping = (YamlMappingNode)yaml;
+        var streamingNode = (YamlMappingNode)yamlMapping["streaming"];
+        
+        var sectorsYaml = yserializer.Serialize(sectors);
+        var sectorsStream = new YamlStream();
+        using (var reader = new StringReader(sectorsYaml))
+        {
+            sectorsStream.Load(reader);
+        }
+        var sectorsNode = sectorsStream.Documents[0].RootNode;
+        
+        streamingNode.Children[new YamlScalarNode("sectors")] = sectorsNode;
+        
+        using (var writer = new StreamWriter(outputPath))
+        {
+            var yamlStream = new YamlStream(new YamlDocument(yamlMapping));
+            yamlStream.Save(writer, false);
+        }
     }
 }

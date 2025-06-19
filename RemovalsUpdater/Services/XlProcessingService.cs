@@ -273,7 +273,7 @@ public class XlProcessingService
         var newActorHashes = newHash.ActorHashes ?? new ulong[0];
         if (oldActorHashes.Length != newActorHashes.Length)
             return false;
-        return oldHash.NodeType == newHash.NodeType && oldHash.Hash == newHash.Hash && oldActorHashes.All(oldActor => newActorHashes.Contains(oldActor));
+        return oldHash.Hash == newHash.Hash && oldActorHashes.All(oldActor => newActorHashes.Contains(oldActor));
     }
     
     private static (JObject, List<Sector>) GetJsonElements(string xlFilePath)

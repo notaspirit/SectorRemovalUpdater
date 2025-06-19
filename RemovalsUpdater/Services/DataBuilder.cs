@@ -127,7 +127,6 @@ public class DataBuilder
         
         var output = new NodeDataEntry
         {
-            NodeType = node.GetType().ToString(),
             Hash = XXHash64.Compute(ms.GetBuffer()),
             ActorHashes = actorHashes
         };
@@ -1030,6 +1029,7 @@ public class DataBuilder
     
     private static void WriteBaseNode(BinaryWriter bw, worldNode node)
     {
+        bw.Write(node.GetType().ToString());
         bw.Write((string?)node.DebugName ?? "");
         bw.Write(node.SourcePrefabHash);
         WriteVector3(bw, node.ProxyScale);

@@ -8,11 +8,8 @@ namespace RemovalsUpdater.Models.RemovalsUpdater;
 public class NodeDataEntry
 {
     [Key(0)]
-    public required string NodeType { get; set; }
-    
-    [Key(1)]
     public required ulong Hash { get; set; }
     
-    [Key(3)]
+    [Key(1)]
     public ulong[]? ActorHashes { get; set; }
 }

@@ -1,11 +1,11 @@
 using Newtonsoft.Json;
 
-namespace RemovalsUpdater.Services;
+namespace SectorRemovalUpdater.Services;
 
 public class SettingsService
 {
     [JsonIgnore]
-    private readonly string _settingsFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RemovalsUpdater", "settings.json");
+    private readonly string _settingsFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SectorRemovalUpdater", "settings.json");
     public string DatabasePath { get; set; }
     public string GamePath { get; set; }
     

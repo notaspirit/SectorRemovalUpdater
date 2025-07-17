@@ -1,4 +1,4 @@
-namespace RemovalsUpdater.Models.RemovalsUpdater;
+namespace SectorRemovalUpdater.Models.RemovalsUpdater;
 
 public class SectorInfo
 {

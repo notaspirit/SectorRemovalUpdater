@@ -1,10 +1,10 @@
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
-using RemovalsUpdater.Models.ArchiveXL;
+using SectorRemovalUpdater.Models.ArchiveXL;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace RemovalsUpdater.YamlConverters;
+namespace SectorRemovalUpdater.YamlConverters;
 
 public class NodeRemovalConverter : IYamlTypeConverter
 {

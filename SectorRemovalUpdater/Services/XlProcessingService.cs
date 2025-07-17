@@ -4,16 +4,16 @@ using DynamicData;
 using MessagePack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RemovalsUpdater.JsonConverters;
-using RemovalsUpdater.YamlConverters;
-using RemovalsUpdater.Models.ArchiveXL;
-using RemovalsUpdater.Models.RemovalsUpdater;
+using SectorRemovalUpdater.JsonConverters;
+using SectorRemovalUpdater.YamlConverters;
+using SectorRemovalUpdater.Models.ArchiveXL;
+using SectorRemovalUpdater.Models.RemovalsUpdater;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
-namespace RemovalsUpdater.Services;
+namespace SectorRemovalUpdater.Services;
 
 public class XlProcessingService
 {

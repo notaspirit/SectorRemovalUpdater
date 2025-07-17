@@ -1,4 +1,4 @@
-namespace RemovalsUpdater.Services;
+namespace SectorRemovalUpdater.Services;
 
 public static class UtilService
 {

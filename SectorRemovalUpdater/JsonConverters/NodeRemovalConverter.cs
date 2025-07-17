@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RemovalsUpdater.Models.ArchiveXL;
+using SectorRemovalUpdater.Models.ArchiveXL;
 
-namespace RemovalsUpdater.JsonConverters;
+namespace SectorRemovalUpdater.JsonConverters;
 
 public class NodeRemovalConverter: JsonConverter<NodeRemoval>
 {

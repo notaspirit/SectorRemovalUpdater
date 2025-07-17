@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace RemovalsUpdater.Models.ArchiveXL;
+namespace SectorRemovalUpdater.Models.ArchiveXL;
 
 public class Sector
 {

@@ -2,7 +2,7 @@
 
 using MessagePack;
 
-namespace RemovalsUpdater.Models.RemovalsUpdater;
+namespace SectorRemovalUpdater.Models.RemovalsUpdater;
 
 [MessagePackObject]
 public class NodeDataEntry

@@ -2,13 +2,14 @@ using System.Diagnostics;
 using System.Text;
 using MessagePack;
 using Newtonsoft.Json;
-using RemovalsUpdater.Models.RemovalsUpdater;
+using SectorRemovalUpdater.Models.RemovalsUpdater;
 using WolvenKit.RED4.Archive.Buffer;
 using WolvenKit.RED4.Types;
 using XXHash3NET;
-using Enums = RemovalsUpdater.Models.RemovalsUpdater.Enums;
+using Enums = SectorRemovalUpdater.Models.RemovalsUpdater.Enums;
+using RemovalsUpdater_Enums = SectorRemovalUpdater.Models.RemovalsUpdater.Enums;
 
-namespace RemovalsUpdater.Services;
+namespace SectorRemovalUpdater.Services;
 
 public class DataBuilder
 {
@@ -27,7 +28,7 @@ public class DataBuilder
 
     public async Task BuildDataSet(string dbns)
     {
-        if (!Enum.TryParse(typeof(Enums.DatabaseNames), dbns, out var dbn) && dbn is not Enums.DatabaseNames)
+        if (!Enum.TryParse(typeof(RemovalsUpdater_Enums.DatabaseNames), dbns, out var dbn) && dbn is not RemovalsUpdater_Enums.DatabaseNames)
         {
             throw new Exception($"Invalid database name: {dbns}");
         }
@@ -60,7 +61,7 @@ public class DataBuilder
         */
         
         
-        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, (Enums.DatabaseNames)dbn)));
+        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, (RemovalsUpdater_Enums.DatabaseNames)dbn)));
         try
         {
             await Task.WhenAll(tasks);
@@ -72,7 +73,7 @@ public class DataBuilder
         Console.WriteLine("Finished build process.");
     }
 
-    private void ProcessSector(string sectorPath, Enums.DatabaseNames dbn)
+    private void ProcessSector(string sectorPath, RemovalsUpdater_Enums.DatabaseNames dbn)
     {
         try
         {

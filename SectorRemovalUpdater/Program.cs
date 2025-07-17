@@ -1,9 +1,9 @@
 ﻿using System.CommandLine.Parsing;
 using MessagePack;
-using RemovalsUpdater.Models.RemovalsUpdater;
-using RemovalsUpdater.Services;
+using SectorRemovalUpdater.Models.RemovalsUpdater;
+using SectorRemovalUpdater.Services;
 
-namespace RemovalsUpdater
+namespace SectorRemovalUpdater
 {
     class Program
     {
@@ -199,7 +199,7 @@ namespace RemovalsUpdater
             if (args.Length == 0)
             {
                 Console.WriteLine("Error: No command provided.");
-                Console.WriteLine("Usage: RemovalsUpdater.exe <command>");
+                Console.WriteLine("Usage: SectorRemovalUpdater.exe <command>");
                 return;
             }
             
@@ -258,7 +258,7 @@ namespace RemovalsUpdater
                     break;
                 default:
                     Console.WriteLine($"Error: Unknown command '{command}'.");
-                    Console.WriteLine("Type 'RemovalsUpdater.exe help' for a list of available commands.");
+                    Console.WriteLine("Type 'SectorRemovalUpdater.exe help' for a list of available commands.");
                     break;
             }
         }

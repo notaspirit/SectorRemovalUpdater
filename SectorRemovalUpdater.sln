@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemovalsUpdater", "RemovalsUpdater\RemovalsUpdater.csproj", "{639348E2-1F11-416C-BEBA-66805D312BF2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SectorRemovalUpdater", "SectorRemovalUpdater\SectorRemovalUpdater.csproj", "{639348E2-1F11-416C-BEBA-66805D312BF2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

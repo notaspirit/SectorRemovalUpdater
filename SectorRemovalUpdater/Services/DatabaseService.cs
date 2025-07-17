@@ -2,9 +2,9 @@ using System.Text;
 using DynamicData;
 using LightningDB;
 using MessagePack;
-using RemovalsUpdater.Models.RemovalsUpdater;
+using SectorRemovalUpdater.Models.RemovalsUpdater;
 
-namespace RemovalsUpdater.Services;
+namespace SectorRemovalUpdater.Services;
 
 public class DatabaseService
 {

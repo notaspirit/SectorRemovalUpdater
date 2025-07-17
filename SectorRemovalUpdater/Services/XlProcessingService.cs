@@ -95,6 +95,12 @@ public class XlProcessingService
             
             // TODO: Remove shuffling for production build
             UtilService.Shuffle(newHashes);
+
+            foreach (var newHash in newHashes)
+            {
+                if (newHash.ActorHashes != null)
+                    UtilService.Shuffle(newHash.ActorHashes);
+            }
             
             var newSector = outSectors.FirstOrDefault(s => s.Path == sector.Path);
 

@@ -148,6 +148,31 @@ namespace SectorRemovalUpdater
                     var ps = new XlProcessingService();
                     ps.Process(args[1], args[2], args[3]);
                     break;
+                case "SaveDatabaseToFile":
+                    if (args.Length < 2)
+                    {
+                        Console.WriteLine("SaveDatabaseToFile usage is <Version> <OutputPath>");
+                        return;
+                    }
+                    var dbsW = DatabaseService.Instance;
+                    dbsW.Initialize(_settingsService.DatabasePath);
+                    dbsW.WriteDataBaseToFile(args[1], args[2]);
+                    break;
+                case "LoadDatabaseFromFile":
+                    if (args.Length < 1)
+                    {
+                        Console.WriteLine("LoadDatabaseFromFile usage is <FilePath>");
+                        return;
+                    }
+                    var dbsR = DatabaseService.Instance;
+                    dbsR.Initialize(_settingsService.DatabasePath);
+                    dbsR.LoadDatabaseFromFile(args[1]);
+                    break;
+                case "ListVersions":
+                    var dbsLV = DatabaseService.Instance;
+                    dbsLV.Initialize(_settingsService.DatabasePath);
+                    Console.WriteLine($"Local Versions: {string.Join(", ", dbsLV.GetDatabaseNames())}");
+                    break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine(" start: Starts the interactive mode");

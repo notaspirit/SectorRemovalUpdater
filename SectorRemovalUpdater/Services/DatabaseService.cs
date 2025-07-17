@@ -133,17 +133,72 @@ public class DatabaseService
     {
         lock (_lock)
         {
-            Console.WriteLine($"Opening database {dbName}");
-            Console.WriteLine($"Database exists: {_databases.ContainsKey(dbName)}");
             if (_databases.ContainsKey(dbName))
                 return;
-            Console.WriteLine("Database not found, creating...");
             using var tx = _env.BeginTransaction();
             var db = tx.OpenDatabase(dbName, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
             tx.Put(_indexingDatabase, Encoding.UTF8.GetBytes(dbName), new byte[0]);
             tx.Commit();
             _databases.Add(dbName, db);
-            Console.WriteLine("Database created.");
         }
+    }
+
+    public void LoadDatabaseFromFile(string filePath)
+    {
+        if (!_isInitialized)
+            throw new ArgumentException("Database not initialized!");
+        
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("File not found.");
+        
+        var fileContent = File.ReadAllBytes(filePath);
+        var fileDB = MessagePackSerializer.Deserialize<DatabaseFile>(fileContent);
+        if (fileDB == null)
+            throw new Exception("Failed to deserialize DatabaseFile");
+        
+        CreateNewDataBase(fileDB.GameVersion);
+        
+        var db = _databases.GetValueOrDefault(fileDB.GameVersion);
+        if (db == null)
+            throw new Exception("Failed to get database");
+        
+        var tx = _env.BeginTransaction();
+        foreach (var sector in fileDB.NodeDataEntries)
+        {
+            tx.Put(db, Encoding.UTF8.GetBytes(sector.Key), MessagePackSerializer.Serialize(sector.Value));
+        }
+        tx.Commit();
+        Console.WriteLine("Database loaded.");
+    }
+
+    public void WriteDataBaseToFile(string dbName, string filePath)
+    {
+        if (!_isInitialized)
+            throw new ArgumentException("Database not initialized!");
+        
+        var db = _databases.GetValueOrDefault(dbName);
+        if (db == null)
+            throw new ArgumentException("Database not found!");
+
+        var outContent = new DatabaseFile();
+        outContent.GameVersion = dbName;
+        outContent.NodeDataEntries = new Dictionary<string, NodeDataEntry[]>();
+        
+        var tx = _env.BeginTransaction();
+        using var cursor = tx.CreateCursor(db);
+        while (MoveNext(cursor, out var key, out var value))
+        {
+            outContent.NodeDataEntries.Add(Encoding.UTF8.GetString(key.AsSpan()), MessagePackSerializer.Deserialize<NodeDataEntry[]>(value.CopyToNewArray()));
+        }
+        
+        tx.Commit();
+        
+        File.WriteAllBytes(filePath, MessagePackSerializer.Serialize(outContent));
+        Console.WriteLine($"Database saved to {filePath}");
+    }
+    
+    public string[] GetDatabaseNames()
+    {
+        return _databases.Keys.ToArray();
     }
 }

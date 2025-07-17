@@ -40,4 +40,16 @@ public static class UtilService
             (array[i], array[j]) = (array[j], array[i]);
         }
     }
+
+    private const string _sectorPathPrefix = @"base\worlds\03_night_city\_compiled\";
+    private const string _sectorPathSuffix = ".streamingsector";
+    public static string GetAbbreviatedSectorPath(string sectorPath)
+    {
+        return sectorPath.Replace(_sectorPathPrefix, "").Replace(_sectorPathSuffix, "");
+    }
+    
+    public static string GetSectorPath(string sectorPath)
+    {
+        return _sectorPathPrefix + sectorPath + _sectorPathSuffix;
+    }
 }

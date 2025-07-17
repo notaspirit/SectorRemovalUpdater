@@ -44,23 +44,6 @@ public class DataBuilder
                 .Select(y => y.FileName)).Distinct().ToList();
 
         Console.WriteLine($"Found {vanillaSectors.Count} vanilla sector files.");
-        foreach (var vanillaSector in vanillaSectors)
-        {
-            if (vanillaSector.Split(".").Last() != "streamingsector")
-            {
-                Console.WriteLine($"Skipping {vanillaSector} because it is not a streaming sector.");
-                continue;
-            }
-        }
-        
-        /*
-        foreach (var vanillaSector in vanillaSectors)
-        {
-            ProcessSector(vanillaSector);
-        }
-        */
-        
-        
         var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, (RemovalsUpdater_Enums.DatabaseNames)dbn)));
         try
         {
@@ -77,7 +60,7 @@ public class DataBuilder
     {
         try
         {
-            if (_dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath), dbn) is { Length: > 0 })
+            if (_dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), dbn) is { Length: > 0 })
                 return;
 
             Console.WriteLine($"Getting {sectorPath}...");
@@ -98,7 +81,7 @@ public class DataBuilder
 
             // Console.WriteLine($"Serializing {sectorPath} which contains {outNodeData.Length} nodes...");
 
-            _dbs.WriteEntry(Encoding.UTF8.GetBytes(sectorPath), MessagePackSerializer.Serialize(outNodeData), dbn);
+            _dbs.WriteEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), MessagePackSerializer.Serialize(outNodeData), dbn);
 
             Console.WriteLine($"Finished {sectorPath}.");
         }

@@ -78,7 +78,7 @@ public class XlProcessingService
         foreach (var sector in sectors)
         {
             // TODO: Remove shuffling for production build, change target db for newHashes
-            var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(sector.Path), Enums.DatabaseNames.OldHashes);
+            var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), Enums.DatabaseNames.OldHashes);
             if (sectorBytes == null)
             {
                 Console.WriteLine($"Failed to get sector {sector.Path}");
@@ -168,7 +168,7 @@ public class XlProcessingService
             foreach (var sectorY in UtilService.ClosestSteps(sectorInfo.Y, _settingsService.MaxSectorDepth))
                 foreach (var sectorZ in UtilService.ClosestSteps(sectorInfo.Z, _settingsService.MaxSectorDepth))
                 {
-                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(sectorPath), Enums.DatabaseNames.NewHashes);
+                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), Enums.DatabaseNames.NewHashes);
                     if (sector == null)
                     {
                         Console.WriteLine($"Failed to get sector {sectorPath}");

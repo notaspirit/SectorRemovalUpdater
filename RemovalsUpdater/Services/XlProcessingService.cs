@@ -178,7 +178,7 @@ public class XlProcessingService
                     foreach (var newHash in newHashes)
                     {
                         var matchRemoval = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
-                        var matchMutation = unresolvedNodes.Values.FirstOrDefault(h => CompareHashes(h, newHash));
+                        var matchMutation = unresolvedMutations.Values.FirstOrDefault(h => CompareHashes(h, newHash));
                         
                         if (matchRemoval == null && matchMutation == null)
                             continue;

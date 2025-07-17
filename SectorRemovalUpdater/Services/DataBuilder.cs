@@ -35,6 +35,8 @@ public class DataBuilder
         if (dbn == null)
             throw new Exception("Game executable not found!");
         
+        _dbs.CreateNewDataBase(dbn);
+        
         var vanillaSectors = _wkit.ArchiveManager.GetGameArchives()
             .SelectMany(x =>
             x.Files.Values.Where(y => y.Extension == ".streamingsector")
@@ -57,8 +59,13 @@ public class DataBuilder
     {
         try
         {
-            if (_dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), dbn) is { Length: > 0 })
-                return;
+            try
+            {
+                if (_dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), dbn) is { Length: > 0 })
+                    return;
+            }
+            catch (ArgumentException) { }
+            
 
             Console.WriteLine($"Getting {sectorPath}...");
             var gameFile = _wkit!.ArchiveManager.GetCR2WFile(sectorPath);

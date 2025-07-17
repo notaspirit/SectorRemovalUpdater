@@ -84,7 +84,7 @@ public class XlProcessingService
             
             var oldSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), fromVersion);
             var newSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), toVersion);
-            if (oldSectorBytes == null || newSectorBytes == null)
+            if (oldSectorBytes?.Length == 0 || newSectorBytes?.Length == 0)
             {
                 Console.WriteLine($"Failed to get sector {sector.Path}");
                 continue;   

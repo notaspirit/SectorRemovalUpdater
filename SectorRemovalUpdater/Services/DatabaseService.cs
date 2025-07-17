@@ -17,6 +17,7 @@ public class DatabaseService
     private static readonly int MaxReaders = 512;
     private static readonly long MapSize = Gb * 100;
     private static bool _isInitialized = false;
+    private static object _lock = new();
     
     public static DatabaseService Instance
     {
@@ -36,16 +37,21 @@ public class DatabaseService
                 MaxDatabases = 1000,
             };
             _env.Open();
-        
+            
+            _databases.Clear();
+            
             var tx = _env.BeginTransaction();
             _indexingDatabase = tx.OpenDatabase("IndexingDatabase", new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
-            using var indexingCursor = tx.CreateCursor(_indexingDatabase);
+            tx.Commit();
+            var tx2 = _env.BeginTransaction();
+            
+            using var indexingCursor = tx2.CreateCursor(_indexingDatabase);
             while (MoveNext(indexingCursor, out var key, out var value))
             {
                 var dbname = Encoding.UTF8.GetString(key.AsSpan());
-                _databases.Add(dbname, tx.OpenDatabase(dbname, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create }));
+                _databases.TryAdd(dbname, tx2.OpenDatabase(dbname, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create }));
             }
-            tx.Commit();
+            tx2.Commit();
             _isInitialized = true;
         }
         catch (Exception e)
@@ -59,9 +65,10 @@ public class DatabaseService
         if (!_isInitialized)
             return;
         using var tx = _env.BeginTransaction();
-        var db = GetOrCreateDatabase(dbName);
-        var code = tx.Put(db, key, value);
-        Console.WriteLine(code.ToString());
+        var db = _databases.GetValueOrDefault(dbName);
+        if (db == null)
+            throw new ArgumentException($"Database {dbName} not found!");
+        tx.Put(db, key, value);
         tx.Commit();
     }
 
@@ -73,7 +80,10 @@ public class DatabaseService
         var db = _databases.GetValueOrDefault(dbName);
         if (db == null)
             throw new ArgumentException($"Database {dbName} not found!");
-        return tx.Get(db, key).value.CopyToNewArray();
+        
+        var outValue = tx.Get(db, key).value.CopyToNewArray();
+        tx.Commit();
+        return outValue;
     }
 
     public (long, long) GetStats(string dbName)
@@ -116,19 +126,24 @@ public class DatabaseService
         var result = cur.GetCurrent();
         key = result.key;
         value = result.value;
-        return result.resultCode == MDBResultCode.Success;
+        return status == MDBResultCode.Success;
     }
     
-    private LightningDatabase GetOrCreateDatabase(string dbName)
+    public void CreateNewDataBase(string dbName)
     {
-        if (_databases.TryGetValue(dbName, out var existingDB))
-            return existingDB;
-        
-        using var tx = _env.BeginTransaction();
-        var db = tx.OpenDatabase(dbName, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
-        _databases.Add(dbName, db);
-        tx.Put(_indexingDatabase, Encoding.UTF8.GetBytes(dbName), new byte[0]);
-        tx.Commit();
-        return db;
+        lock (_lock)
+        {
+            Console.WriteLine($"Opening database {dbName}");
+            Console.WriteLine($"Database exists: {_databases.ContainsKey(dbName)}");
+            if (_databases.ContainsKey(dbName))
+                return;
+            Console.WriteLine("Database not found, creating...");
+            using var tx = _env.BeginTransaction();
+            var db = tx.OpenDatabase(dbName, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+            tx.Put(_indexingDatabase, Encoding.UTF8.GetBytes(dbName), new byte[0]);
+            tx.Commit();
+            _databases.Add(dbName, db);
+            Console.WriteLine("Database created.");
+        }
     }
 }

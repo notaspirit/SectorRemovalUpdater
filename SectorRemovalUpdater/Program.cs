@@ -50,31 +50,25 @@ namespace SectorRemovalUpdater
             switch (commandArray[0])
             {
                 case "HashNodes":
-                    if (commandArray.Length < 2)
-                    {
-                        Console.WriteLine("This command requires 1 parameter!");
-                        return;
-                    }
-                    
                     var dataBuilder = new DataBuilder();
                     dataBuilder.Initialize();
                     
-                    await dataBuilder.BuildDataSet(commandArray[1]);
+                    await dataBuilder.BuildDataSet();
                     break;
                 case "DataBaseStats":
                     if (commandArray.Length < 2)
                     {
-                        Console.WriteLine("This command requires 1 parameter!");
+                        Console.WriteLine("DataBaseStats command requires 1 argument: <DatabaseName>");
                         return;
                     }
-                    DatabaseService.Instance.Initialize(commandArray[1]);
-                    var (size, entries) = DatabaseService.Instance.GetStats(Enums.DatabaseNames.OldHashes);
+                    DatabaseService.Instance.Initialize(_settingsService.DatabasePath);
+                    var (size, entries) = DatabaseService.Instance.GetStats(commandArray[1]);
                     Console.WriteLine($"Database size: {size} bytes with {entries} entries.");
                     break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine("  exit: exits the program");
-                    Console.WriteLine("  HashNodes <DatabaseName>: generates hashes for the currently selected game version ");
+                    Console.WriteLine("  HashNodes: generates hashes for the currently selected game version ");
                     Console.WriteLine("  DataBaseStats <DatabaseName>: prints the size and amount of entries in the database");
                     Console.WriteLine("  help: shows this help message");
                     break;
@@ -145,20 +139,20 @@ namespace SectorRemovalUpdater
                     }
                     break;
                 case "update":
-                    if (args.Length < 3)
+                    if (args.Length < 4)
                     {
-                        Console.WriteLine("update command requires 2 arguments: <path> <outPath>");
+                        Console.WriteLine("update command requires 3 arguments: <path> <outPath> <targetVersion>");
                         return;
                     }
 
                     var ps = new XlProcessingService();
-                    ps.Process(args[1], args[2]);
+                    ps.Process(args[1], args[2], args[3]);
                     break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine(" start: Starts the interactive mode");
                     Console.WriteLine(" config <set|get> <key?> <value?>: Adjust config");
-                    Console.WriteLine(" update <xlFilePath> <outFilePath>:  Updates the removal file");
+                    Console.WriteLine(" update <xlFilePath> <outFilePath> <targetVersion>:  Updates the removal file");
                     Console.WriteLine(" help:  Displays this help message");
                     break;
                 default:

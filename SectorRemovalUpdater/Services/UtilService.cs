@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SectorRemovalUpdater.Services;
 
 public static class UtilService
@@ -51,5 +53,11 @@ public static class UtilService
     public static string GetSectorPath(string sectorPath)
     {
         return _sectorPathPrefix + sectorPath + _sectorPathSuffix;
+    }
+
+    public static string? GetGameVersion(string gameDirPath)
+    {
+        var filePath = Path.Combine(gameDirPath, "bin", "x64", "Cyberpunk2077.exe");
+        return !File.Exists(filePath) ? null : FileVersionInfo.GetVersionInfo(filePath).ProductVersion;
     }
 }

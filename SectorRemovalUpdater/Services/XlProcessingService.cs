@@ -45,7 +45,7 @@ public class XlProcessingService
     }
     
     
-    public void Process(string xlFilePath, string outputPath)
+    public void Process(string xlFilePath, string outputPath, string toVersion)
     {
         JObject? json = null;
         YamlNode? yaml = null;
@@ -64,30 +64,36 @@ public class XlProcessingService
         if (sectors == null)
             throw new Exception("Failed to parse XL file.");
         
-        var pSectors = ProcessSectors(sectors);
+        var fromVersion = UtilService.GetGameVersion(_settingsService.GamePath);
+        if (fromVersion == null)
+            throw new Exception("Game executable not found!");
+        
+        var pSectors = ProcessSectors(sectors, fromVersion, toVersion);
         if (json != null)
             WriteJson(json, pSectors, outputPath);
         if (yaml != null)
             WriteYaml(yaml, pSectors, outputPath);
     }
 
-    private List<Sector> ProcessSectors(List<Sector> sectors)
+    private List<Sector> ProcessSectors(List<Sector> sectors, string fromVersion, string toVersion)
     {
         List<Sector> outSectors = new();
 
         foreach (var sector in sectors)
         {
-            // TODO: Remove shuffling for production build, change target db for newHashes
-            var sectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), Enums.DatabaseNames.OldHashes);
-            if (sectorBytes == null)
+            
+            var oldSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), fromVersion);
+            var newSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), toVersion);
+            if (oldSectorBytes == null || newSectorBytes == null)
             {
                 Console.WriteLine($"Failed to get sector {sector.Path}");
                 continue;   
             }
             
-            var oldHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
-            var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(sectorBytes);
+            var oldHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(oldSectorBytes);
+            var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(newSectorBytes);
             
+            // TODO: Remove shuffling for production build
             UtilService.Shuffle(newHashes);
             
             var newSector = outSectors.FirstOrDefault(s => s.Path == sector.Path);
@@ -150,7 +156,7 @@ public class XlProcessingService
                 }
 
             }
-            ResolveUnResolvedNodes(ref outSectors, unresolvedRemovals, unresolvedMutations, sector.Path);
+            ResolveUnResolvedNodes(ref outSectors, unresolvedRemovals, unresolvedMutations, sector.Path, toVersion);
         }
         
         return outSectors;
@@ -158,7 +164,7 @@ public class XlProcessingService
 
     private void ResolveUnResolvedNodes(ref List<Sector> sectors,
         Dictionary<NodeRemoval, NodeDataEntry> unresolvedNodes,
-        Dictionary<NodeMutation, NodeDataEntry> unresolvedMutations, string sectorPath)
+        Dictionary<NodeMutation, NodeDataEntry> unresolvedMutations, string sectorPath, string toVersion)
     {
         if (unresolvedNodes.Count + unresolvedMutations.Count == 0)
             return;
@@ -168,7 +174,7 @@ public class XlProcessingService
             foreach (var sectorY in UtilService.ClosestSteps(sectorInfo.Y, _settingsService.MaxSectorDepth))
                 foreach (var sectorZ in UtilService.ClosestSteps(sectorInfo.Z, _settingsService.MaxSectorDepth))
                 {
-                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), Enums.DatabaseNames.NewHashes);
+                    var sector = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sectorPath)), toVersion);
                     if (sector == null)
                     {
                         Console.WriteLine($"Failed to get sector {sectorPath}");

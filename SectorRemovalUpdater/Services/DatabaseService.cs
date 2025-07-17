@@ -9,13 +9,14 @@ namespace SectorRemovalUpdater.Services;
 public class DatabaseService
 {
     private static DatabaseService? _instance;
-    private LightningDatabase[] _databases = new LightningDatabase[2];
+    private LightningDatabase _indexingDatabase;
+    private Dictionary<string, LightningDatabase> _databases = new();
     private LightningEnvironment _env;
     private static readonly long Kb = 1024;
     private static readonly long Gb = Kb * Kb * Kb;
     private static readonly int MaxReaders = 512;
     private static readonly long MapSize = Gb * 100;
-    private static bool _isInitailized = false;
+    private static bool _isInitialized = false;
     
     public static DatabaseService Instance
     {
@@ -24,7 +25,7 @@ public class DatabaseService
     
     public void Initialize(string envPath)
     {
-        if (_isInitailized)
+        if (_isInitialized)
             return;
         try
         {
@@ -32,17 +33,20 @@ public class DatabaseService
             {
                 MaxReaders = MaxReaders,
                 MapSize = MapSize,
-                MaxDatabases = 2,
+                MaxDatabases = 1000,
             };
             _env.Open();
         
             var tx = _env.BeginTransaction();
-            foreach (var dbname in Enum.GetValues(typeof(Enums.DatabaseNames)))
+            _indexingDatabase = tx.OpenDatabase("IndexingDatabase", new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+            using var indexingCursor = tx.CreateCursor(_indexingDatabase);
+            while (MoveNext(indexingCursor, out var key, out var value))
             {
-                _databases[(int)dbname] = tx.OpenDatabase(dbname.ToString(), new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+                var dbname = Encoding.UTF8.GetString(key.AsSpan());
+                _databases.Add(dbname, tx.OpenDatabase(dbname, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create }));
             }
             tx.Commit();
-            _isInitailized = true;
+            _isInitialized = true;
         }
         catch (Exception e)
         {
@@ -50,31 +54,36 @@ public class DatabaseService
         }
     }
 
-    public void WriteEntry(byte[] key, byte[] value, Enums.DatabaseNames dbn)
+    public void WriteEntry(byte[] key, byte[] value, string dbName)
     {
-        if (!_isInitailized)
+        if (!_isInitialized)
             return;
         using var tx = _env.BeginTransaction();
-        var db = _databases[(int)dbn];
+        var db = GetOrCreateDatabase(dbName);
         var code = tx.Put(db, key, value);
         Console.WriteLine(code.ToString());
         tx.Commit();
     }
 
-    public byte[]? GetEntry(byte[] key, Enums.DatabaseNames dbn)
+    public byte[]? GetEntry(byte[] key, string dbName)
     {
-        if (!_isInitailized)
+        if (!_isInitialized)
             return null;
         using var tx = _env.BeginTransaction();
-        var db = _databases[(int)dbn];
+        var db = _databases.GetValueOrDefault(dbName);
+        if (db == null)
+            throw new ArgumentException($"Database {dbName} not found!");
         return tx.Get(db, key).value.CopyToNewArray();
     }
 
-    public (long, long) GetStats(Enums.DatabaseNames dbn)
+    public (long, long) GetStats(string dbName)
     {
-        if (!_isInitailized)
+        if (!_isInitialized)
             return (0, 0);
-        var db = _databases[(int)dbn];
+        var db = _databases.GetValueOrDefault(dbName);
+        if (db == null)
+            return (0, 0);
+        
         using var tx = _env.BeginTransaction();
         var size = db.DatabaseStats.PageSize;
         var entires = db.DatabaseStats.Entries;
@@ -82,21 +91,21 @@ public class DatabaseService
         return (size, entires);
     }
 
-    public List<KeyValuePair<string, byte[]>>? DumpDB(Enums.DatabaseNames dbn)
+    public List<KeyValuePair<string, byte[]>>? DumpDB(string dbName)
     {
-        if (!_isInitailized)
+        if (!_isInitialized)
             return null;
-        var db = _databases[(int)dbn];
+        var db = _databases.GetValueOrDefault(dbName);
+        if (db == null)
+            return null;
         using var tx = _env.BeginTransaction();
         using var cursor = tx.CreateCursor(db);
-        var i = 0;
         
         var output = new List<KeyValuePair<string, byte[]>>();
         
         while (MoveNext(cursor, out var key, out var value))
         {
             output.Add(new KeyValuePair<string, byte[]>(Encoding.UTF8.GetString(key.AsSpan()), value.CopyToNewArray()));
-            i++;
         }
         return output;
     }
@@ -108,5 +117,18 @@ public class DatabaseService
         key = result.key;
         value = result.value;
         return result.resultCode == MDBResultCode.Success;
+    }
+    
+    private LightningDatabase GetOrCreateDatabase(string dbName)
+    {
+        if (_databases.TryGetValue(dbName, out var existingDB))
+            return existingDB;
+        
+        using var tx = _env.BeginTransaction();
+        var db = tx.OpenDatabase(dbName, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create });
+        _databases.Add(dbName, db);
+        tx.Put(_indexingDatabase, Encoding.UTF8.GetBytes(dbName), new byte[0]);
+        tx.Commit();
+        return db;
     }
 }

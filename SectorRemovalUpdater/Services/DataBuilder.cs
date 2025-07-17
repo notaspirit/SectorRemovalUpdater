@@ -6,8 +6,6 @@ using SectorRemovalUpdater.Models.RemovalsUpdater;
 using WolvenKit.RED4.Archive.Buffer;
 using WolvenKit.RED4.Types;
 using XXHash3NET;
-using Enums = SectorRemovalUpdater.Models.RemovalsUpdater.Enums;
-using RemovalsUpdater_Enums = SectorRemovalUpdater.Models.RemovalsUpdater.Enums;
 
 namespace SectorRemovalUpdater.Services;
 
@@ -26,25 +24,24 @@ public class DataBuilder
         _dbs.Initialize(_settings.DatabasePath);
     }
 
-    public async Task BuildDataSet(string dbns)
+    public async Task BuildDataSet()
     {
-        if (!Enum.TryParse(typeof(RemovalsUpdater_Enums.DatabaseNames), dbns, out var dbn) && dbn is not RemovalsUpdater_Enums.DatabaseNames)
-        {
-            throw new Exception($"Invalid database name: {dbns}");
-        }
-        
         Console.WriteLine("Starting build process...");
         
         if (_wkit == null)
             throw new Exception("WolvenkitWrapper instance is not initialized.");
 
+        var dbn = UtilService.GetGameVersion(_settings.GamePath);
+        if (dbn == null)
+            throw new Exception("Game executable not found!");
+        
         var vanillaSectors = _wkit.ArchiveManager.GetGameArchives()
             .SelectMany(x =>
             x.Files.Values.Where(y => y.Extension == ".streamingsector")
                 .Select(y => y.FileName)).Distinct().ToList();
 
         Console.WriteLine($"Found {vanillaSectors.Count} vanilla sector files.");
-        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, (RemovalsUpdater_Enums.DatabaseNames)dbn)));
+        var tasks = vanillaSectors.Select(s => Task.Run(() => ProcessSector(s, dbn)));
         try
         {
             await Task.WhenAll(tasks);
@@ -56,7 +53,7 @@ public class DataBuilder
         Console.WriteLine("Finished build process.");
     }
 
-    private void ProcessSector(string sectorPath, RemovalsUpdater_Enums.DatabaseNames dbn)
+    private void ProcessSector(string sectorPath, string dbn)
     {
         try
         {

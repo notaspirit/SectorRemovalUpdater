@@ -8,6 +8,7 @@ using SectorRemovalUpdater.JsonConverters;
 using SectorRemovalUpdater.YamlConverters;
 using SectorRemovalUpdater.Models.ArchiveXL;
 using SectorRemovalUpdater.Models.RemovalsUpdater;
+using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -45,30 +46,42 @@ public class XlProcessingService
     }
     
     
-    public void Process(string xlFilePath, string outputPath, string toVersion)
+    public void Process(string xlFilePath, string outputPath, string sourceVersion, string toVersion)
     {
         JObject? json = null;
         YamlNode? yaml = null;
+        
+        Exception? yamlException = null;
+        Exception? jsonException = null;
         List<Sector>? sectors = null;
         try
         {
             (json, sectors) = GetJsonElements(xlFilePath);
         }
-        catch (Exception) { }
+        catch (Exception e)
+        {
+            jsonException = e;
+        }
         if (json == null || sectors == null)
             try
             {
                 (yaml, sectors) = GetYamlElements(xlFilePath);
             }
-            catch (Exception e) { }
+            catch (Exception e)
+            {
+                yamlException = e;
+            }
+
         if (sectors == null)
-            throw new Exception("Failed to parse XL file.");
+        {
+            if (yamlException != null)
+                throw yamlException;
+            if (jsonException != null)
+                throw jsonException;
+            throw new Exception("Failed to get sectors from file.");
+        }
         
-        var fromVersion = UtilService.GetGameVersion(_settingsService.GamePath);
-        if (fromVersion == null)
-            throw new Exception("Game executable not found!");
-        
-        var pSectors = ProcessSectors(sectors, fromVersion, toVersion);
+        var pSectors = ProcessSectors(sectors, sourceVersion, toVersion);
         if (json != null)
             WriteJson(json, pSectors, outputPath);
         if (yaml != null)
@@ -81,7 +94,8 @@ public class XlProcessingService
 
         foreach (var sector in sectors)
         {
-            
+            if (_settingsService.VerboseLogging)
+                Console.WriteLine($"Updating {sector.Path}...");
             var oldSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), fromVersion);
             var newSectorBytes = _dbs.GetEntry(Encoding.UTF8.GetBytes(UtilService.GetAbbreviatedSectorPath(sector.Path)), toVersion);
             if (oldSectorBytes?.Length == 0 || newSectorBytes?.Length == 0)
@@ -92,15 +106,6 @@ public class XlProcessingService
             
             var oldHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(oldSectorBytes);
             var newHashes = MessagePackSerializer.Deserialize<NodeDataEntry[]>(newSectorBytes);
-            
-            // TODO: Remove shuffling for production build
-            UtilService.Shuffle(newHashes);
-
-            foreach (var newHash in newHashes)
-            {
-                if (newHash.ActorHashes != null)
-                    UtilService.Shuffle(newHash.ActorHashes);
-            }
             
             var newSector = outSectors.FirstOrDefault(s => s.Path == sector.Path);
 
@@ -125,9 +130,13 @@ public class XlProcessingService
                 foreach (var node in sector.NodeDeletions)
                 {
                     var oldHash = oldHashes[node.Index];
-                    if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
-                        continue;
-
+                    
+                    if (node.Index < newHashes.Length)
+                    {
+                        if (ProcessNode(node, oldHash, newHashes[node.Index], node.Index, ref newSector))
+                            continue;
+                    }
+                    
                     foreach (var newHash in newHashes)
                     {
                         if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
@@ -152,7 +161,7 @@ public class XlProcessingService
                     foreach (var newHash in newHashes)
                     {
                         if (ProcessNode(node, oldHash, newHash, newHashes.IndexOf(newHash), ref newSector))
-                            goto continueOuter; 
+                            goto continueOuter;
                     }
                 
                     unresolvedMutations.Add(node, oldHash);
@@ -164,7 +173,6 @@ public class XlProcessingService
             }
             ResolveUnResolvedNodes(ref outSectors, unresolvedRemovals, unresolvedMutations, sector.Path, toVersion);
         }
-        
         return outSectors;
     }
 
@@ -238,7 +246,7 @@ public class XlProcessingService
         Console.WriteLine($"Unresolved nodeData Indices are: { string.Join(", ", unresolvedNodes.Keys.Select(x => x.Index).ToList())}");
     }
     
-    private static bool ProcessNode(BaseNode node, NodeDataEntry oldHash, NodeDataEntry newHash, int newHashIndex, ref Sector sector)
+    private bool ProcessNode(BaseNode node, NodeDataEntry oldHash, NodeDataEntry newHash, int newHashIndex, ref Sector sector)
     {
         if (!CompareHashes(oldHash, newHash))
             return false;
@@ -249,6 +257,8 @@ public class XlProcessingService
         if (oldHash.ActorHashes == null || newHash.ActorHashes == null || node is not InstancedNodeRemoval inr)
         {
             AddNode(node, ref sector);
+            if (_settingsService.VerboseLogging)
+                Console.WriteLine($"Node {oldNodeIndex} is now {newHashIndex}.");
             return true;
         }
         
@@ -261,6 +271,8 @@ public class XlProcessingService
         inr.ActorDeletions = MatchActors(relevantIndicies, newHash.ActorHashes!.ToList(), sector.Path, oldNodeIndex);
                     
         AddNode(node, ref sector);
+        if (_settingsService.VerboseLogging)
+            Console.WriteLine($"Node {oldNodeIndex} is now {newHashIndex}.");
         return true;
     }
 
@@ -316,14 +328,15 @@ public class XlProcessingService
         return matchedActors;
     }
     
-    private static bool CompareHashes(NodeDataEntry oldHash, NodeDataEntry newHash)
+    private bool CompareHashes(NodeDataEntry oldHash, NodeDataEntry newHash)
     {
-        // Checking actor hashes as well since instanced nodes are often identical apart from their actors, however this will miss instanced nodes where the actors have changed
+        // Checking actor hashes as well since instanced nodes are often identical apart from their actors, however, when instanced nodes / collision actors change, it is challenging to match them again
         var oldActorHashes = oldHash.ActorHashes ?? new ulong[0];
         var newActorHashes = newHash.ActorHashes ?? new ulong[0];
-        if (oldActorHashes.Length != newActorHashes.Length)
-            return false;
-        return oldHash.Hash == newHash.Hash && oldActorHashes.All(oldActor => newActorHashes.Contains(oldActor));
+        if (oldActorHashes.Length == 0)
+            return oldHash.Hash == newHash.Hash;
+        var matchingCount = oldActorHashes.Select(oldActor => newActorHashes.Contains(oldActor)).Count(x => x);
+        return oldHash.Hash == newHash.Hash && ((double)matchingCount / (double)oldActorHashes.Length) >= _settingsService.MinimumActorHashMatchRate;
     }
     
     private static (JObject, List<Sector>) GetJsonElements(string xlFilePath)

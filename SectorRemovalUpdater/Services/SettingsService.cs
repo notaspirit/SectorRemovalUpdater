@@ -11,6 +11,8 @@ public class SettingsService
     
     public bool EnableMods { get; set; }
     public int MaxSectorDepth { get; set; }
+    public double MinimumActorHashMatchRate { get; set; }
+    public bool VerboseLogging { get; set; }
     
     [JsonIgnore]
     private static SettingsService? instance;
@@ -41,7 +43,9 @@ public class SettingsService
         DatabasePath = "";
         GamePath = "";
         EnableMods = false;
-        MaxSectorDepth = 10;
+        MaxSectorDepth = 2;
+        MinimumActorHashMatchRate = 0.9;
+        VerboseLogging = false;
     }
     
     private void LoadSettings()
@@ -61,6 +65,8 @@ public class SettingsService
         GamePath = savedSettings.GamePath;
         EnableMods = savedSettings.EnableMods;
         MaxSectorDepth = savedSettings.MaxSectorDepth;
+        MinimumActorHashMatchRate = savedSettings.MinimumActorHashMatchRate;
+        VerboseLogging = savedSettings.VerboseLogging;
     }
 
     public void SaveSettings()
@@ -77,7 +83,9 @@ public class SettingsService
             new("DatabasePath", DatabasePath),
             new("GamePath", GamePath),
             new("EnableMods", EnableMods.ToString()),
-            new("MaxSectorDepth", MaxSectorDepth.ToString())
+            new("MaxSectorDepth", MaxSectorDepth.ToString()),
+            new("MinimumActorHashMatchRate", MinimumActorHashMatchRate.ToString()),
+            new("VerboseLogging", VerboseLogging.ToString())
         };
     }
 
@@ -110,6 +118,24 @@ public class SettingsService
                 }
 
                 MaxSectorDepth = maxSectorDepth;
+                break;
+            case "MinimumActorHashMatchRate":
+                var parsedDouble = double.TryParse(value, out var minActorHashMatchRate);
+                if (!parsedDouble)
+                {
+                    Console.WriteLine("Failed to parse MinimumActorHashMatchRate value.");
+                    break;
+                }
+                MinimumActorHashMatchRate = minActorHashMatchRate;
+                break;
+            case "VerboseLogging":
+                var parsedVerboseLogging = bool.TryParse(value, out var verboseLogging);
+                if (!parsedVerboseLogging)
+                {
+                    Console.WriteLine("Failed to parse VerboseLogging value.");
+                    break;
+                }
+                VerboseLogging = verboseLogging;
                 break;
             default:
                 Console.WriteLine($"Unknown setting '{key}'.");

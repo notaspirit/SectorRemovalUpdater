@@ -139,14 +139,14 @@ namespace SectorRemovalUpdater
                     }
                     break;
                 case "update":
-                    if (args.Length < 4)
+                    if (args.Length < 5)
                     {
-                        Console.WriteLine("update command requires 3 arguments: <path> <outPath> <targetVersion>");
+                        Console.WriteLine("update command requires 3 arguments: <path> <outPath> <sourceVersion> <targetVersion>");
                         return;
                     }
 
                     var ps = new XlProcessingService();
-                    ps.Process(args[1], args[2], args[3]);
+                    ps.Process(args[1], args[2], args[3], args[4]);
                     break;
                 case "SaveDatabaseToFile":
                     if (args.Length < 2)

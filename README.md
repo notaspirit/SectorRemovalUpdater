@@ -1,5 +1,7 @@
 # Sector Removal Updater
 
+![GitHub all releases](https://img.shields.io/github/downloads/notaspirit/SectorRemovalUpdater/total) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/notaspirit/SectorRemovalUpdater) ![GitHub latest release date](https://img.shields.io/github/release-date/notaspirit/SectorRemovalUpdater)
+
 SRU is a tool for automatically updating ArchiveXL Sector Node Removals and Mutations.
 
 ## Usage Instructions

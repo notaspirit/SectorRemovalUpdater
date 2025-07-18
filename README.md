@@ -24,5 +24,5 @@ This is intended for versions which don't yet have a precompiled binary.
 2. Run `SectorRemovalsUpdater.exe update <PATH TO XL> <PATH TO OUTPUT XL> <SourceVersion> <TargetVersion>`
 
 ### Additional Notes
-SRU only matches exact node matches, meaing if a node changed it will not be found even if the change is minor.
+SRU only matches exact nodes, meaning if a node changed it will not be found even if the change is minor.
 If instanced or collision nodes fail lowering the MinimumActorHashMatchRate value may help find more but can introduce false positives.

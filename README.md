@@ -13,7 +13,7 @@ You can either download precompiled hashes (based on basegame + phantom liberty)
 This is the recommended way for versions which have a precompiled binary.
 1. Download the Hashes from the Releases Page for the Versions you need
 2. Open a new terminal in the folder you unzipped SRU to
-3. Load the Hashes with `SectorRemovalsUpdater.exe LoadDatabaseFromFile <PATH TO BIN>`
+3. Load the Hashes with `SectorRemovalUpdater.exe LoadDatabaseFromFile <PATH TO BIN>`
 ##### Building the Hashes
 This is intended for versions which don't yet have a precompiled binary.
 1. Open a new terminal in the folder you unzipped SRU to
@@ -21,7 +21,7 @@ This is intended for versions which don't yet have a precompiled binary.
 3. Build the hashes with `HashNodes`
 ### Updating Removal files
 1. Open a new terminal in the folder you unzipped SRU to
-2. Run `SectorRemovalsUpdater.exe update <PATH TO XL> <PATH TO OUTPUT XL> <SourceVersion> <TargetVersion>`
+2. Run `SectorRemovalUpdater.exe update <PATH TO XL> <PATH TO OUTPUT XL> <SourceVersion> <TargetVersion>`
 
 ### Additional Notes
 SRU only matches exact nodes, meaning if a node changed it will not be found even if the change is minor.

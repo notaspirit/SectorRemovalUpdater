@@ -40,7 +40,7 @@ public class SettingsService
     
     private SettingsService()
     {
-        DatabasePath = "";
+        DatabasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SectorRemovalUpdater", "Database");
         GamePath = "";
         EnableMods = false;
         MaxSectorDepth = 2;

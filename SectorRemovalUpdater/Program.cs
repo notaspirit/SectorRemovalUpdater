@@ -97,7 +97,8 @@ namespace SectorRemovalUpdater
             if (args.Length == 0)
             {
                 Console.WriteLine("Error: No command provided.");
-                Console.WriteLine("Usage: SectorRemovalUpdater.exe <command>");
+                Console.WriteLine("Usage: SectorRemovalUpdater <command>");
+                Console.WriteLine("Type 'SectorRemovalUpdater help' for a list of available commands.");
                 return;
             }
             
@@ -177,12 +178,12 @@ namespace SectorRemovalUpdater
                     Console.WriteLine("Available commands:");
                     Console.WriteLine(" start: Starts the interactive mode");
                     Console.WriteLine(" config <set|get> <key?> <value?>: Adjust config");
-                    Console.WriteLine(" update <xlFilePath> <outFilePath> <targetVersion>:  Updates the removal file");
+                    Console.WriteLine(" update <path> <outPath> <sourceVersion> <targetVersion>:  Updates the removal file");
                     Console.WriteLine(" help:  Displays this help message");
                     break;
                 default:
                     Console.WriteLine($"Error: Unknown command '{command}'.");
-                    Console.WriteLine("Type 'SectorRemovalUpdater.exe help' for a list of available commands.");
+                    Console.WriteLine("Type 'SectorRemovalUpdater help' for a list of available commands.");
                     break;
             }
         }

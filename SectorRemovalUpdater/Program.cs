@@ -1,7 +1,16 @@
 ﻿using System.CommandLine.Parsing;
+using System.Text;
+using DiffPlex.DiffBuilder;
+using DynamicData;
 using MessagePack;
+using Newtonsoft.Json;
+using SectorRemovalUpdater.Models.ArchiveXL;
 using SectorRemovalUpdater.Models.RemovalsUpdater;
 using SectorRemovalUpdater.Services;
+using WolvenKit.RED4.Archive.Buffer;
+using WolvenKit.RED4.CR2W.JSON;
+using WolvenKit.RED4.Types;
+using ChangeType = DiffPlex.DiffBuilder.Model.ChangeType;
 
 namespace SectorRemovalUpdater
 {
@@ -64,6 +73,115 @@ namespace SectorRemovalUpdater
                     DatabaseService.Instance.Initialize(_settingsService.DatabasePath);
                     var (size, entries) = DatabaseService.Instance.GetStats(commandArray[1]);
                     Console.WriteLine($"Database size: {size} bytes with {entries} entries.");
+                    break;
+                case "DiffDuplicates":
+                    var matchedNodesCSV = File.ReadAllLines("F:\\dev0\\prjk\\SRU Testing\\nodeHashesChecked.csv");
+
+                    var hashesWithDiff = new List<HashDuplicate>();
+                    
+                    foreach (var line in matchedNodesCSV)
+                    {
+                        if (matchedNodesCSV.IndexOf(line) == 0)
+                            continue;
+                        
+                        var columns = line.Split(',');
+
+                        var hashWithDiff = new HashDuplicate()
+                        {
+                            Hash = ulong.Parse(columns[0])
+                        };
+                        var occuranceCount = columns.Length - 2 / 2;
+                        
+                        for (int i = 2; i < occuranceCount; i += 2)
+                        {
+                            hashWithDiff.HashOccurances.Add(new SourceAndDiff()
+                            {
+                                Index = int.Parse(columns[i+1]),
+                                SectorPath = UtilService.GetSectorPath(columns[i])
+                            });
+                        }
+                        hashesWithDiff.Add(hashWithDiff);
+                    }
+                    
+                    var sectorToHashOccurrences = hashesWithDiff
+                        .SelectMany(hd => hd.HashOccurances.Select(so => new KeyValuePair<ulong, SourceAndDiff>(hd.Hash, so)))
+                        .GroupBy(kvp => kvp.Value.SectorPath)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g.ToList()
+                        );
+
+
+                    var wkit = WolvenKitWrapper.Instance;
+                    
+                    var firstHashNode = new Dictionary<ulong, (string, string)>();
+                    
+                    foreach (var sector in sectorToHashOccurrences)
+                    {
+                        var sectorCR2W = wkit.ArchiveManager.GetCR2WFile(sector.Key);
+                        if (sectorCR2W is not { RootChunk: worldStreamingSector wse })
+                        {
+                            Console.WriteLine($"Failed to get sector {sector.Key}");
+                            continue;
+                        }
+
+                        var nodeData = wse.NodeData.Data as CArray<worldNodeData>;
+                        
+                        foreach (var hashOccurance in sector.Value)
+                        {
+                            var nodeDataEntry = nodeData[hashOccurance.Value.Index];
+                            var nodeEntry = wse.Nodes[nodeDataEntry.NodeIndex].Chunk;
+
+                            hashOccurance.Value.NodeType = nodeEntry.GetType().Name;
+
+                            var hashFirstInstances = firstHashNode.TryGetValue(hashOccurance.Key, out var firstInstance) ? firstInstance : (null, null);
+                            
+                            if (string.IsNullOrWhiteSpace(hashFirstInstances.Item1) && string.IsNullOrWhiteSpace(hashFirstInstances.Item2))
+                            {
+                                var firstNodeInstanceSerialized = RedJsonSerializer.Serialize(nodeEntry);
+                                var firstNodeDataInstanceSerialized = RedJsonSerializer.Serialize(nodeDataEntry);
+                                hashOccurance.Value.JsonDiffNode = "";
+                                hashOccurance.Value.JsonDiffNodeData = "";
+                                
+                                firstHashNode.Add(hashOccurance.Key, (firstNodeInstanceSerialized, firstNodeDataInstanceSerialized));
+                                continue;
+                            }
+                            
+                            var newNodeInstanceSerialized = RedJsonSerializer.Serialize(nodeEntry);
+                            var newDataInstanceSerialized = RedJsonSerializer.Serialize(nodeDataEntry);
+
+                            hashOccurance.Value.JsonDiffNode = "";
+                            hashOccurance.Value.JsonDiffNodeData = "";
+                            var diffBuilder = new InlineDiffBuilder(new DiffPlex.Differ());
+                            if (hashFirstInstances.Item1 != newNodeInstanceSerialized)
+                            {
+                                var diffNode = diffBuilder.BuildDiffModel(hashFirstInstances.Item1, newNodeInstanceSerialized);
+                                foreach (var line in diffNode.Lines)
+                                {
+                                    if (line.Type != ChangeType.Unchanged)
+                                    {
+                                        hashOccurance.Value.JsonDiffNode += line.Text + Environment.NewLine;
+                                    }
+                                }  
+                            }
+
+                            if (hashFirstInstances.Item2 != newDataInstanceSerialized)
+                            {
+                                var diffNodeData = diffBuilder.BuildDiffModel(hashFirstInstances.Item2, newDataInstanceSerialized);
+                                foreach (var line in diffNodeData.Lines)
+                                {
+                                    if (line.Type != ChangeType.Unchanged)
+                                    {
+                                        hashOccurance.Value.JsonDiffNodeData += line.Text + Environment.NewLine;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    
+                    File.WriteAllText("F:\\dev0\\prjk\\SRU Testing\\nodeHashesWithDiff.json", JsonConvert.SerializeObject(hashesWithDiff, Formatting.Indented));
+                    Console.WriteLine("Finished Diffing Hashes.");
                     break;
                 case "help":
                     Console.WriteLine("Available commands:");
@@ -173,6 +291,132 @@ namespace SectorRemovalUpdater
                     var dbsLV = DatabaseService.Instance;
                     dbsLV.Initialize(_settingsService.DatabasePath);
                     Console.WriteLine($"Local Versions: {string.Join(", ", dbsLV.GetDatabaseNames())}");
+                    break;
+                case "CheckHashDuplicates":
+                    if (args.Length < 1)
+                    {
+                        Console.WriteLine("CheckHashDuplicates usage is <Version>");
+                        return;
+                    }
+                    var dbsCHD = DatabaseService.Instance;
+                    dbsCHD.Initialize(_settingsService.DatabasePath);
+                    Console.WriteLine($"Checking For Duplicates in Version {args[1]}...");
+                    var nodeHashCount = new Dictionary<ulong, int>();
+                    var actorHashCount = new Dictionary<ulong, int>();
+                    var allEntries = dbsCHD.DumpDB(args[1]);
+                    if (allEntries == null)
+                    {
+                        Console.WriteLine("Failed to load database!");
+                        return;
+                    }
+                    foreach (var entry in allEntries)
+                    {
+                        var sector = MessagePackSerializer.Deserialize<NodeDataEntry[]>(entry.Value);
+                        foreach (var hash in sector)
+                        {
+                            if (hash.ActorHashes == null || hash.ActorHashes?.Length == 0)
+                            {
+                                if (nodeHashCount.TryGetValue(hash.Hash, out var count))
+                                {
+                                    count += 1;
+                                    nodeHashCount[hash.Hash] = count;
+                                }
+                                else
+                                {
+                                    nodeHashCount.Add(hash.Hash, 1);
+                                }
+                            }
+                            else
+                            {
+                                foreach (var actorHash in hash?.ActorHashes)
+                                {
+                                    if (actorHashCount.TryGetValue(actorHash, out var count))
+                                    {
+                                        count += 1;
+                                        actorHashCount[actorHash] = count;
+                                    }
+                                    else
+                                    {
+                                        actorHashCount.Add(actorHash, 1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var sbNode = new StringBuilder();
+                    sbNode.AppendLine("Hash, Count");
+                    foreach (var node in nodeHashCount.Where(node => node.Value > 1))
+                    {
+                        sbNode.AppendLine($"{node.Key},{node.Value}");
+                    }
+                    File.WriteAllText("F:\\dev0\\prjk\\SRU Testing\\nodeDuplicates.csv", sbNode.ToString());
+                    
+                    var sbActor = new StringBuilder();
+                    sbActor.AppendLine("Hash, Count");
+                    foreach (var node in actorHashCount.Where(node => node.Value > 1))
+                    {
+                        sbNode.AppendLine($"{node.Key},{node.Value}");
+                    }
+                    File.WriteAllText("F:\\dev0\\prjk\\SRU Testing\\actorDuplicates.csv", sbActor.ToString());
+                    
+                    Console.WriteLine("Finished Checking for Duplicates.");
+                    break;
+                case "MatchHashes":
+                    if (args.Length < 1)
+                    {
+                        Console.WriteLine("MatchHashes usage is <Version>");
+                        return;
+                    }
+                    Console.WriteLine($"Matching Hashes to Sector and Index for {args[1]}...");
+                    var dbsMH = DatabaseService.Instance;
+                    dbsMH.Initialize(_settingsService.DatabasePath);
+                    var nodeHashes = File.ReadAllLines("F:\\dev0\\prjk\\SRU Testing\\nodeDuplicates.csv");
+                    var allEntriesMH = dbsMH.DumpDB(args[1]);
+                    if (allEntriesMH == null)
+                    {
+                        Console.WriteLine("Failed to load database!");
+                        return;
+                    }
+
+                    nodeHashes[0] += ",Sector,Index";
+                    
+                    foreach (var entry in allEntriesMH)
+                    {
+                        Console.WriteLine($"Processing [{allEntriesMH.IndexOf(entry) + 1} / {allEntriesMH.Count}] {entry.Key}...");
+                        var sector = MessagePackSerializer.Deserialize<NodeDataEntry[]>(entry.Value);
+                        foreach (var node in sector)
+                        {
+                            var matchingHash = nodeHashes.FirstOrDefault(h => h.Split(',')[0] == node.Hash.ToString());
+                            if (matchingHash == null)
+                                continue;
+
+                            var index = nodeHashes.IndexOf(matchingHash);
+                            
+                            Console.WriteLine($"Found node for {node.Hash}, {sector.IndexOf(node)} {entry.Key}");
+                            
+                            matchingHash += $", {entry.Key}, {sector.IndexOf(node)}";
+                            nodeHashes[index] = matchingHash;
+                        }
+                    }
+                    
+                    File.WriteAllLines("F:\\dev0\\prjk\\SRU Testing\\nodeHashesChecked.csv", nodeHashes);
+                    Console.WriteLine("Finished Matching Hashes.");
+                    break;
+                case "RemoveIdenticalNodes":
+                    var allHashDupes = JsonConvert.DeserializeObject<List<HashDuplicate>>(File.ReadAllText("F:\\dev0\\prjk\\SRU Testing\\nodeHashesWithDiff.json"));
+                    var nodesWithNonEmptyDiff = allHashDupes.Where(hd => hd.HashOccurances.Any(so => !string.IsNullOrWhiteSpace(so.JsonDiffNode) || !string.IsNullOrWhiteSpace(so.JsonDiffNodeData))).ToList();
+                    File.WriteAllText("F:\\dev0\\prjk\\SRU Testing\\nodesWithNonEmptyDiff.json", JsonConvert.SerializeObject(nodesWithNonEmptyDiff, Formatting.Indented));
+                    Console.WriteLine("Finished Removing Identical Nodes.");
+                    break;
+                case "BreakIntoChunkBasedOnNodeType":
+                    var allHashDupes2 = JsonConvert.DeserializeObject<List<HashDuplicate>>(File.ReadAllText("F:\\dev0\\prjk\\SRU Testing\\nodesWithNonEmptyDiff.json"));
+                    var sortByNodeType = allHashDupes2.GroupBy(hd => hd.HashOccurances.First().NodeType).ToDictionary(g => g.Key, g => g.ToList());
+                    foreach (var nodeType in sortByNodeType)
+                    {
+                        File.WriteAllText($"F:\\dev0\\prjk\\SRU Testing\\nodesWithNonEmptyDiff_{nodeType.Key}.json", JsonConvert.SerializeObject(nodeType.Value, Formatting.Indented));
+                    }
+                    Console.WriteLine("Finished Breaking Into Chunk Based On Node Type.");
                     break;
                 case "help":
                     Console.WriteLine("Available commands:");

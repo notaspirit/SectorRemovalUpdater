@@ -52,7 +52,7 @@ public static class UtilService
     
     public static string GetSectorPath(string sectorPath)
     {
-        return _sectorPathPrefix + sectorPath + _sectorPathSuffix;
+        return _sectorPathPrefix + sectorPath.Trim() + _sectorPathSuffix;
     }
 
     public static string? GetGameVersion(string gameDirPath)

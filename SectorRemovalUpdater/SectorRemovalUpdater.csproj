@@ -10,6 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="DiffPlex" Version="1.8.0" />
       <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.27.0" />
       <PackageReference Include="LightningDB" Version="0.16.0" />
       <PackageReference Include="MessagePack" Version="3.1.4" />

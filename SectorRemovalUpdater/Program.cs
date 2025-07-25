@@ -405,10 +405,36 @@ namespace SectorRemovalUpdater
                     break;
                 case "RemoveIdenticalNodes":
                     var allHashDupes = JsonConvert.DeserializeObject<List<HashDuplicate>>(File.ReadAllText("F:\\dev0\\prjk\\SRU Testing\\nodeHashesWithDiff.json"));
-                    var nodesWithNonEmptyDiff = allHashDupes.Where(hd => hd.HashOccurances.Any(so => !string.IsNullOrWhiteSpace(so.JsonDiffNode) || !string.IsNullOrWhiteSpace(so.JsonDiffNodeData))).ToList();
+                    var nodesWithNonEmptyDiff = allHashDupes.Where(hd => hd.HashOccurances.Any(so => !string.IsNullOrWhiteSpace(so.JsonDiffNode) || !isOnlyIdOrNodeIndex(so.JsonDiffNodeData))).ToList();
                     File.WriteAllText("F:\\dev0\\prjk\\SRU Testing\\nodesWithNonEmptyDiff.json", JsonConvert.SerializeObject(nodesWithNonEmptyDiff, Formatting.Indented));
                     Console.WriteLine("Finished Removing Identical Nodes.");
                     break;
+
+                    bool isOnlyIdOrNodeIndex(string diff)
+                    {
+                        var parts = diff.Split(@",");
+                        if (string.IsNullOrWhiteSpace(diff))
+                        {
+                            return true;
+                        }
+                        Console.WriteLine(diff);
+                        Console.WriteLine(parts.Length);
+                        if (parts.Length == 1)
+                        {
+                            // Console.WriteLine("Only 1 line");
+                            return true;
+                        }
+                        foreach (var part in parts)
+                        {
+                            if (!part.Contains("Id") && !part.Contains("NodeIndex") && !string.IsNullOrWhiteSpace(part.Trim()))
+                            {
+                                Console.WriteLine($"Part: {part} - Not Id or NodeIndex");
+                                return false;   
+                            }
+                        }
+                        Console.WriteLine("Only Id or NodeIndex");
+                        return true;
+                    }
                 case "BreakIntoChunkBasedOnNodeType":
                     var allHashDupes2 = JsonConvert.DeserializeObject<List<HashDuplicate>>(File.ReadAllText("F:\\dev0\\prjk\\SRU Testing\\nodesWithNonEmptyDiff.json"));
                     var sortByNodeType = allHashDupes2.GroupBy(hd => hd.HashOccurances.First().NodeType).ToDictionary(g => g.Key, g => g.ToList());

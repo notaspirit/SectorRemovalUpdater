@@ -82,7 +82,7 @@ public partial class MainWindow : Window
             }
         };
 
-        var startFolder = await TryGetFolderAsync(Path.GetDirectoryName(_viewModel.InputPath));
+        var startFolder = await TryGetArchiveStartFolderAsync(_viewModel);
         if (startFolder != null)
             options.SuggestedStartLocation = startFolder;
 
@@ -116,7 +116,7 @@ public partial class MainWindow : Window
             }
         };
 
-        var startFolder = await TryGetFolderAsync(Path.GetDirectoryName(_viewModel.InputPath));
+        var startFolder = await TryGetArchiveStartFolderAsync(_viewModel);
         if (startFolder != null)
             options.SuggestedStartLocation = startFolder;
 
@@ -280,6 +280,25 @@ public partial class MainWindow : Window
             _viewModel.CloseConfirmed = true;
 
         Close();
+    }
+
+    private async Task<IStorageFolder?> TryGetArchiveStartFolderAsync(MainWindowViewModel viewModel)
+    {
+        var currentDirectory = Path.GetDirectoryName(viewModel.InputPath);
+        if (!string.IsNullOrWhiteSpace(currentDirectory) && Directory.Exists(currentDirectory))
+            return await TryGetFolderAsync(currentDirectory);
+
+        if (!string.IsNullOrWhiteSpace(viewModel.GamePath))
+        {
+            var modFolder = Path.Combine(viewModel.GamePath, "archive", "pc", "mod");
+            if (Directory.Exists(modFolder))
+                return await TryGetFolderAsync(modFolder);
+
+            if (Directory.Exists(viewModel.GamePath))
+                return await TryGetFolderAsync(viewModel.GamePath);
+        }
+
+        return null;
     }
 
     private async Task<IStorageFolder?> TryGetFolderAsync(string? path)

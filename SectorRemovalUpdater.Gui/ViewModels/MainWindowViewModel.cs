@@ -18,6 +18,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private readonly SettingsService _settings;
     private readonly DatabaseService _database;
+    private readonly GitHubReleaseService _releaseService = new();
     private readonly ConcurrentQueue<LogEntry> _pendingLogs = new();
     private readonly DispatcherTimer _logTimer;
 
@@ -42,6 +43,8 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     public ObservableCollection<string> Versions { get; } = new();
+
+    public ObservableCollection<ReleaseAsset> ReleaseAssets { get; } = new();
 
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
 
@@ -73,6 +76,26 @@ public partial class MainWindowViewModel : ObservableObject
     private string? selectedDatabaseVersion;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DownloadReleaseAssetCommand))]
+    private ReleaseAsset? selectedReleaseAsset;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshReleaseAssetsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadReleaseAssetCommand))]
+    private bool isReleaseListLoading;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshReleaseAssetsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadReleaseAssetCommand))]
+    private bool isReleaseDownloading;
+
+    [ObservableProperty]
+    private double releaseDownloadProgress;
+
+    [ObservableProperty]
+    private string releaseStatus = "Loading the list of precompiled databases from GitHub...";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(BuildHashesCommand))]
     private string gamePath = string.Empty;
 
@@ -98,6 +121,8 @@ public partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SaveSettingsCommand))]
     [NotifyCanExecuteChangedFor(nameof(ReloadVersionsCommand))]
     [NotifyCanExecuteChangedFor(nameof(SwapVersionsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RefreshReleaseAssetsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadReleaseAssetCommand))]
     private bool isBusy;
 
     [ObservableProperty]
@@ -157,6 +182,8 @@ public partial class MainWindowViewModel : ObservableObject
         StatusMessage = HasVersions
             ? "Ready."
             : "No hash database loaded. Build or load one to get started.";
+
+        _ = LoadReleaseAssetsAsync(logErrors: false);
     }
 
     public void Shutdown()
@@ -192,12 +219,14 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        string? loadedVersion = null;
         await RunBusyAsync(
             $"Loading database from {Path.GetFileName(path)}...",
-            () => Task.Run(() => _database.LoadDatabaseFromFile(path)),
+            () => Task.Run(() => loadedVersion = _database.LoadDatabaseFromFile(path)),
             "Database loaded.");
 
         RefreshVersionList();
+        SelectLoadedVersion(loadedVersion);
     }
 
     public async Task SaveDatabaseToFileAsync(string path)
@@ -223,6 +252,105 @@ public partial class MainWindowViewModel : ObservableObject
             $"Saving database version {version}...",
             () => Task.Run(() => _database.WriteDataBaseToFile(version, path)),
             $"Database saved to {Path.GetFileName(path)}.");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRefreshReleaseAssets))]
+    private Task RefreshReleaseAssetsAsync() => LoadReleaseAssetsAsync(logErrors: true);
+
+    [RelayCommand(CanExecute = nameof(CanDownloadReleaseAsset))]
+    private async Task DownloadReleaseAssetAsync()
+    {
+        var asset = SelectedReleaseAsset;
+        if (asset is null)
+        {
+            Fail("Select a precompiled hash database to download first.");
+            return;
+        }
+
+        SyncSettings();
+        if (!EnsureDatabase())
+        {
+            Fail("The hash database is not available.");
+            return;
+        }
+
+        var succeeded = false;
+        var temporaryFileDeleted = false;
+        string? loadedVersion = null;
+
+        IsReleaseDownloading = true;
+        ReleaseDownloadProgress = 0;
+        ReleaseStatus = $"Downloading {asset.Name}...";
+
+        try
+        {
+            succeeded = await RunBusyAsync(
+                $"Downloading {asset.Name} from GitHub...",
+                async () =>
+                {
+                    var progress = new Progress<DownloadProgress>(value =>
+                    {
+                        if (!IsReleaseDownloading)
+                            return;
+
+                        if (value.Total is > 0 && value.Received >= value.Total)
+                        {
+                            ReleaseDownloadProgress = 100;
+                            ReleaseStatus = $"Importing {asset.Name} into the local hash database...";
+                            StatusMessage = ReleaseStatus;
+                            return;
+                        }
+
+                        ReleaseDownloadProgress = value.Total is > 0
+                            ? value.Received * 100d / value.Total.Value
+                            : 0d;
+
+                        var totalText = value.Total is > 0
+                            ? $" of {ReleaseAsset.FormatSize(value.Total.Value)}"
+                            : string.Empty;
+
+                        ReleaseStatus =
+                            $"Downloading {asset.Name}: {ReleaseAsset.FormatSize(value.Received)}{totalText} " +
+                            $"({ReleaseDownloadProgress:0.0}%)";
+                        StatusMessage = ReleaseStatus;
+                    });
+
+                    var result = await _releaseService.DownloadAndLoadDatabaseAsync(_database, asset, progress);
+                    loadedVersion = result.GameVersion;
+                    temporaryFileDeleted = result.TemporaryFileDeleted;
+
+                    AddLog(
+                        $"Downloaded and imported {asset.Name} ({ReleaseAsset.FormatSize(asset.Size)}).",
+                        LogLevel.Success);
+                },
+                $"Downloaded and imported {asset.Name}.");
+
+            if (succeeded)
+            {
+                RefreshVersionList();
+                SelectLoadedVersion(loadedVersion);
+            }
+        }
+        finally
+        {
+            IsReleaseDownloading = false;
+            ReleaseDownloadProgress = 0;
+        }
+
+        if (succeeded)
+        {
+            var loadedText = string.IsNullOrWhiteSpace(loadedVersion)
+                ? $"Imported {asset.Name}."
+                : $"Loaded version {loadedVersion} from {asset.Name}.";
+
+            ReleaseStatus = temporaryFileDeleted
+                ? $"{loadedText} The downloaded file was deleted."
+                : $"{loadedText} The temporary download could not be deleted.";
+        }
+        else
+        {
+            ReleaseStatus = $"Could not download or import {asset.Name}: {StatusMessage}";
+        }
     }
 
     public string GetLogText()
@@ -426,6 +554,19 @@ public partial class MainWindowViewModel : ObservableObject
 
     private bool CanReloadVersions() => !IsBusy;
 
+    private bool CanRefreshReleaseAssets()
+    {
+        return !IsBusy && !IsReleaseListLoading && !IsReleaseDownloading;
+    }
+
+    private bool CanDownloadReleaseAsset()
+    {
+        return !IsBusy
+               && !IsReleaseListLoading
+               && !IsReleaseDownloading
+               && SelectedReleaseAsset != null;
+    }
+
     private void LoadSettingsFromService()
     {
         GamePath = _settings.GamePath ?? string.Empty;
@@ -460,6 +601,58 @@ public partial class MainWindowViewModel : ObservableObject
         _settings.MaxSectorDepth = (int)Clamp(MaxSectorDepth ?? 2m, 0m, 10m, 2m);
         _settings.MinimumActorHashMatchRate = (double)Clamp(MinimumActorHashMatchRate ?? 0.9m, 0m, 1m, 0.9m);
         _settings.VerboseLogging = VerboseLogging;
+    }
+
+    private async Task LoadReleaseAssetsAsync(bool logErrors)
+    {
+        if (IsReleaseListLoading || IsReleaseDownloading)
+            return;
+
+        var previousSelection = SelectedReleaseAsset?.Name;
+
+        IsReleaseListLoading = true;
+        ReleaseStatus = "Loading the list of precompiled databases from GitHub...";
+
+        try
+        {
+            var assets = await _releaseService.GetAssetsAsync();
+
+            ReleaseAssets.Clear();
+            foreach (var asset in assets)
+                ReleaseAssets.Add(asset);
+
+            if (ReleaseAssets.Count == 0)
+            {
+                SelectedReleaseAsset = null;
+                ReleaseStatus = "The PrecompiledBinaries release does not contain any .bin files.";
+                return;
+            }
+
+            SelectedReleaseAsset = ReleaseAssets.FirstOrDefault(asset =>
+                string.Equals(asset.Name, previousSelection, StringComparison.OrdinalIgnoreCase))
+                ?? ReleaseAssets[^1];
+
+            ReleaseStatus = $"Found {ReleaseAssets.Count} precompiled hash database(s) on GitHub.";
+            AddLog(ReleaseStatus, LogLevel.Success);
+        }
+        catch (Exception e)
+        {
+            ReleaseStatus = $"Could not load the precompiled database list: {e.Message}";
+            if (logErrors)
+                AddLog(ReleaseStatus, LogLevel.Warning);
+        }
+        finally
+        {
+            IsReleaseListLoading = false;
+        }
+    }
+
+    private void SelectLoadedVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version) || !Versions.Contains(version))
+            return;
+
+        SelectedDatabaseVersion = version;
     }
 
     private bool EnsureDatabase()
@@ -654,17 +847,19 @@ public partial class MainWindowViewModel : ObservableObject
         return true;
     }
 
-    private async Task RunBusyAsync(string busyMessage, Func<Task> action, string? successMessage = null)
+    private async Task<bool> RunBusyAsync(string busyMessage, Func<Task> action, string? successMessage = null)
     {
         if (IsBusy)
-            return;
+            return false;
 
         IsBusy = true;
         StatusMessage = busyMessage;
+        var succeeded = false;
 
         try
         {
             await action();
+            succeeded = true;
 
             if (!string.IsNullOrWhiteSpace(successMessage))
                 StatusMessage = successMessage;
@@ -682,6 +877,8 @@ public partial class MainWindowViewModel : ObservableObject
             NotifyCanExecuteChanged();
             FlushPendingLogs();
         }
+
+        return succeeded;
     }
 
     private void OnConsoleLine(string line)
@@ -773,6 +970,8 @@ public partial class MainWindowViewModel : ObservableObject
         BuildHashesCommand.NotifyCanExecuteChanged();
         SaveSettingsCommand.NotifyCanExecuteChanged();
         ReloadVersionsCommand.NotifyCanExecuteChanged();
+        RefreshReleaseAssetsCommand.NotifyCanExecuteChanged();
+        DownloadReleaseAssetCommand.NotifyCanExecuteChanged();
     }
 
     private void OpenFolder(string? directory, string description)

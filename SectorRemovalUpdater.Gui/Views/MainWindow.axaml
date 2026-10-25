@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:SectorRemovalUpdater.Gui.ViewModels"
+        xmlns:svc="using:SectorRemovalUpdater.Services"
         x:Class="SectorRemovalUpdater.Gui.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         mc:Ignorable="d"
@@ -33,8 +34,11 @@
                             VerticalAlignment="Center">
                     <ProgressBar Width="130"
                                  Height="5"
-                                 IsIndeterminate="True"
                                  IsVisible="{Binding IsBusy}"
+                                 IsIndeterminate="{Binding !IsReleaseDownloading}"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ReleaseDownloadProgress}"
                                  VerticalAlignment="Center" />
                     <ToggleButton x:Name="ThemeToggle"
                                   Content="Dark mode"
@@ -158,6 +162,48 @@
                                         <Button Content="Save version to file..." Click="SaveDatabase_Click" />
                                         <Button Content="Open folder" Command="{Binding OpenDatabaseFolderCommand}" />
                                     </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="sectionTitle" Text="Precompiled hash databases" />
+                                        <Button Grid.Column="1"
+                                                Content="Refresh list"
+                                                Command="{Binding RefreshReleaseAssetsCommand}"
+                                                Padding="12,4" />
+                                    </Grid>
+                                    <TextBlock Classes="subtle"
+                                               TextWrapping="Wrap"
+                                               Text="Download a hash database from the PrecompiledBinaries GitHub release and import it directly. The downloaded .bin file is deleted after it has been imported." />
+                                    <ComboBox ItemsSource="{Binding ReleaseAssets}"
+                                              SelectedItem="{Binding SelectedReleaseAsset, Mode=TwoWay}"
+                                              PlaceholderText="Select a precompiled database"
+                                              HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="svc:ReleaseAsset">
+                                                <TextBlock Text="{Binding DisplayName}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Button Classes="accent"
+                                                Content="Download and load"
+                                                Command="{Binding DownloadReleaseAssetCommand}"
+                                                Padding="18,8" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="subtle"
+                                                   Margin="12,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding ReleaseStatus}" />
+                                    </Grid>
+                                    <ProgressBar IsVisible="{Binding IsReleaseDownloading}"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Value="{Binding ReleaseDownloadProgress}"
+                                                 Height="6" />
                                 </StackPanel>
                             </Border>
 

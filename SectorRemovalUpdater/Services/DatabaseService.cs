@@ -200,7 +200,7 @@ public class DatabaseService
         }
     }
 
-    public void LoadDatabaseFromFile(string filePath)
+    public string LoadDatabaseFromFile(string filePath)
     {
         if (!_isInitialized)
             throw new ArgumentException("Database not initialized!");
@@ -226,6 +226,7 @@ public class DatabaseService
         }
         tx.Commit();
         Console.WriteLine("Database loaded.");
+        return fileDB.GameVersion;
     }
 
     public void WriteDataBaseToFile(string dbName, string filePath)

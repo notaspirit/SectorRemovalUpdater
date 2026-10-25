@@ -18,10 +18,12 @@ The GUI wraps the normal update and hash workflow in a single window with an act
 ### Using the GUI
 
 1. Start the GUI build for your platform: `SectorRemovalUpdater.Gui.exe` on Windows, or `./SectorRemovalUpdater.Gui` on Linux/macOS.
-2. Open **Hashes & Database** and either load a precompiled `.bin` hash file or build the hashes from your game installation.
+2. Open **Hashes & Database** and either load a local precompiled `.bin` hash file, download one from the [PrecompiledBinaries release](https://github.com/notaspirit/SectorRemovalUpdater/releases/tag/PrecompiledBinaries), or build the hashes from your game installation.
 3. Open **Settings** and set the **Cyberpunk 2077 game folder** to the folder that contains `bin/x64/Cyberpunk2077.exe`.
-4. Open **Update file**, choose the ArchiveXL file you want to update and an output path, then select the source and target game versions.
+4. Open **Update file**, choose the ArchiveXL file you want to update and an output path, then select the source and target game versions. The file picker starts in the configured game's `archive/pc/mod` folder when no input file has been selected yet.
 5. Click **Update file**. The original file is left untouched.
+
+Precompiled databases can be downloaded directly in the app. The GUI downloads the selected `.bin` into a temporary folder, verifies it against the SHA-256 digest published by GitHub, imports it into the local LMDB database, and then deletes the temporary file.
 
 The **activity log** at the bottom of the window captures everything the shared services print, and can be copied or saved to a text file. It also reports errors when a database or operation cannot be opened.
 
@@ -84,6 +86,17 @@ You can either download precompiled hashes (based on basegame + phantom liberty)
 ##### Downloading the Hashes
 
 This is the recommended option for versions which have a precompiled binary.
+
+The CLI can list the available precompiled databases and load one directly. The download is verified against the SHA-256 digest published by GitHub, imported into the local database, and the temporary `.bin` file is deleted afterwards:
+
+```bash
+SectorRemovalUpdater.exe ListReleaseDatabases
+SectorRemovalUpdater.exe LoadReleaseDatabase <Version>
+```
+
+The version shown after loading is the game version stored inside the downloaded database.
+
+Alternatively, download the `.bin` from the Releases Page yourself and load it from disk:
 
 1. Download the Hashes from the Releases Page for the Versions you need
 2. Open a new terminal in the folder you unzipped SRU to

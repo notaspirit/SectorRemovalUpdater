@@ -8,6 +8,7 @@ namespace SectorRemovalUpdater
     class Program
     {
         private static SettingsService _settingsService = SettingsService.Instance;
+        private static readonly GitHubReleaseService _releaseService = new();
         
         /// <summary>
         /// Starts the interactive mode
@@ -65,11 +66,24 @@ namespace SectorRemovalUpdater
                     var (size, entries) = DatabaseService.Instance.GetStats(commandArray[1]);
                     Console.WriteLine($"Database size: {size} bytes with {entries} entries.");
                     break;
+                case "ListReleaseDatabases":
+                    await ListReleaseDatabases();
+                    break;
+                case "LoadReleaseDatabase":
+                    if (commandArray.Length < 2)
+                    {
+                        Console.WriteLine("LoadReleaseDatabase command requires 1 argument: <Version>");
+                        return;
+                    }
+                    await LoadReleaseDatabase(commandArray[1]);
+                    break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine("  exit: exits the program");
                     Console.WriteLine("  HashNodes: generates hashes for the currently selected game version ");
                     Console.WriteLine("  DataBaseStats <DatabaseName>: prints the size and amount of entries in the database");
+                    Console.WriteLine("  ListReleaseDatabases: lists precompiled hash databases available on GitHub");
+                    Console.WriteLine("  LoadReleaseDatabase <Version>: downloads and loads a precompiled hash database");
                     Console.WriteLine("  help: shows this help message");
                     break;
                 default:
@@ -85,6 +99,129 @@ namespace SectorRemovalUpdater
         static string[] ParseArguments(string input)
         {
             return CommandLineStringSplitter.Instance.Split(input).ToArray();
+        }
+
+        /// <summary>
+        /// Lists the precompiled hash databases available in the GitHub release.
+        /// </summary>
+        static async Task ListReleaseDatabases()
+        {
+            try
+            {
+                Console.WriteLine($"Fetching precompiled hash databases from {GitHubReleaseService.ReleaseUrl}...");
+                var assets = await _releaseService.GetAssetsAsync();
+
+                if (assets.Count == 0)
+                {
+                    Console.WriteLine("No precompiled .bin databases are available.");
+                    return;
+                }
+
+                Console.WriteLine("Available precompiled hash databases:");
+                foreach (var asset in assets)
+                    Console.WriteLine($"  {asset.Version} ({ReleaseAsset.FormatSize(asset.Size)}) - {asset.Name}");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Downloads a precompiled hash database, imports it, and deletes the temporary file.
+        /// </summary>
+        /// <param name="requestedVersion">Version or asset name to download</param>
+        static async Task LoadReleaseDatabase(string requestedVersion)
+        {
+            try
+            {
+                Console.WriteLine($"Fetching precompiled hash databases from {GitHubReleaseService.ReleaseUrl}...");
+                var assets = await _releaseService.GetAssetsAsync();
+
+                var asset = assets.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Version, requestedVersion, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(candidate.Name, requestedVersion, StringComparison.OrdinalIgnoreCase));
+
+                if (asset is null)
+                {
+                    Console.WriteLine($"No precompiled database matches '{requestedVersion}'.");
+                    if (assets.Count > 0)
+                        Console.WriteLine($"Available versions: {string.Join(", ", assets.Select(candidate => candidate.Version))}");
+                    return;
+                }
+
+                var database = DatabaseService.Instance;
+                database.Initialize(_settingsService.DatabasePath);
+                if (!database.IsInitialized)
+                {
+                    Console.WriteLine("Could not open the local hash database.");
+                    return;
+                }
+
+                Console.WriteLine($"Downloading {asset.Name} ({ReleaseAsset.FormatSize(asset.Size)})...");
+                var progress = new ConsoleDownloadProgress();
+                ReleaseDatabaseLoadResult result;
+                try
+                {
+                    result = await _releaseService.DownloadAndLoadDatabaseAsync(database, asset, progress);
+                }
+                finally
+                {
+                    progress.Finish();
+                }
+
+                Console.WriteLine($"Loaded {asset.Name} into local database version {result.GameVersion}.");
+                Console.WriteLine(result.TemporaryFileDeleted
+                    ? "The temporary downloaded file was deleted."
+                    : "Warning: the temporary downloaded file could not be deleted.");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error: {e.Message}");
+            }
+        }
+
+        private sealed class ConsoleDownloadProgress : IProgress<DownloadProgress>
+        {
+            private int _lastPercent = -1;
+            private bool _lineOpen;
+
+            public void Report(DownloadProgress value)
+            {
+                var percent = value.Total is > 0
+                    ? (int)(value.Received * 100d / value.Total.Value)
+                    : 0;
+
+                if (percent == _lastPercent)
+                    return;
+
+                _lastPercent = percent;
+
+                var totalText = value.Total is > 0
+                    ? $" of {ReleaseAsset.FormatSize(value.Total.Value)}"
+                    : string.Empty;
+
+                Console.Write($"\r  {percent,3}% ({ReleaseAsset.FormatSize(value.Received)}{totalText})");
+
+                if (percent >= 100)
+                {
+                    Console.WriteLine();
+                    _lineOpen = false;
+                }
+                else
+                {
+                    _lineOpen = true;
+                }
+            }
+
+            public void Finish()
+            {
+                if (!_lineOpen)
+                    return;
+
+                Console.WriteLine();
+                _lineOpen = false;
+            }
         }
         
         /// <summary>
@@ -174,11 +311,25 @@ namespace SectorRemovalUpdater
                     dbsLV.Initialize(_settingsService.DatabasePath);
                     Console.WriteLine($"Local Versions: {string.Join(", ", dbsLV.GetDatabaseNames())}");
                     break;
+                case "ListReleaseDatabases":
+                    await ListReleaseDatabases();
+                    break;
+                case "LoadReleaseDatabase":
+                    if (args.Length < 2)
+                    {
+                        Console.WriteLine("LoadReleaseDatabase usage is <Version>");
+                        Console.WriteLine("Use ListReleaseDatabases to list available versions.");
+                        return;
+                    }
+                    await LoadReleaseDatabase(args[1]);
+                    break;
                 case "help":
                     Console.WriteLine("Available commands:");
                     Console.WriteLine(" start: Starts the interactive mode");
                     Console.WriteLine(" config <set|get> <key?> <value?>: Adjust config");
                     Console.WriteLine(" update <path> <outPath> <sourceVersion> <targetVersion>:  Updates the removal file");
+                    Console.WriteLine(" ListReleaseDatabases: Lists precompiled hash databases available on GitHub");
+                    Console.WriteLine(" LoadReleaseDatabase <Version>: Downloads and loads a precompiled hash database");
                     Console.WriteLine(" help:  Displays this help message");
                     break;
                 default:

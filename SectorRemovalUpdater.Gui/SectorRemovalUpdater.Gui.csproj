@@ -20,6 +20,7 @@
         <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+        <PackageReference Include="Projektanker.Icons.Avalonia.FontAwesome" Version="9.6.2" />
     </ItemGroup>
 
     <ItemGroup>

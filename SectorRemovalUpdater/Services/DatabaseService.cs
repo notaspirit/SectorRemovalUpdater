@@ -11,13 +11,20 @@ public class DatabaseService
     private static DatabaseService? _instance;
     private LightningDatabase _indexingDatabase;
     private Dictionary<string, LightningDatabase> _databases = new();
-    private LightningEnvironment _env;
+    private LightningEnvironment _env = null!;
     private static readonly long Kb = 1024;
     private static readonly long Gb = Kb * Kb * Kb;
     private static readonly int MaxReaders = 512;
     private static readonly long MapSize = Gb * 100;
     private static bool _isInitialized = false;
-    private static object _lock = new();
+    private static readonly object _lock = new();
+
+    public bool IsInitialized => _isInitialized;
+
+    /// <summary>
+    /// Path of the LMDB environment that is currently open, or null when it is closed.
+    /// </summary>
+    public string? EnvironmentPath { get; private set; }
     
     public static DatabaseService Instance
     {
@@ -52,11 +59,61 @@ public class DatabaseService
                 _databases.TryAdd(dbname, tx2.OpenDatabase(dbname, new DatabaseConfiguration() { Flags = DatabaseOpenFlags.Create }));
             }
             tx2.Commit();
+            EnvironmentPath = envPath;
             _isInitialized = true;
         }
         catch (Exception e)
         {
             Console.WriteLine($"Failed to initialize database! {e}");
+            try
+            {
+                _env?.Dispose();
+            }
+            catch
+            {
+                // The environment may be partially open; ignore cleanup errors.
+            }
+
+            _env = null!;
+            _databases.Clear();
+            EnvironmentPath = null;
+            _isInitialized = false;
+        }
+    }
+
+    /// <summary>
+    /// Closes the LMDB environment so it can be reopened with a different path.
+    /// </summary>
+    public void Shutdown()
+    {
+        lock (_lock)
+        {
+            foreach (var database in _databases.Values)
+            {
+                try
+                {
+                    database.Dispose();
+                }
+                catch
+                {
+                    // Ignore errors while shutting down.
+                }
+            }
+
+            _databases.Clear();
+
+            try
+            {
+                _env?.Dispose();
+            }
+            catch
+            {
+                // Ignore errors while shutting down.
+            }
+
+            _env = null!;
+            EnvironmentPath = null;
+            _isInitialized = false;
         }
     }
 

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <RootNamespace>SectorRemovalUpdater.Gui</RootNamespace>
+        <AssemblyName>SectorRemovalUpdater.Gui</AssemblyName>
+        <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+        <ServerGarbageCollection>true</ServerGarbageCollection>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="11.3.22" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AvaloniaResource Include="Assets\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SectorRemovalUpdater\SectorRemovalUpdater.csproj" />
+    </ItemGroup>
+
+</Project>

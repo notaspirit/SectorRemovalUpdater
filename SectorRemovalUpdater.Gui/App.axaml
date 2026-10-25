@@ -1,0 +1,9 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SectorRemovalUpdater.Gui.App"
+             RequestedThemeVariant="Default">
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://SectorRemovalUpdater.Gui/Styles/AppStyles.axaml" />
+    </Application.Styles>
+</Application>

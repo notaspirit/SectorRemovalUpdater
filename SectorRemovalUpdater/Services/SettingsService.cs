@@ -6,6 +6,10 @@ public class SettingsService
 {
     [JsonIgnore]
     private readonly string _settingsFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SectorRemovalUpdater", "settings.json");
+
+    [JsonIgnore]
+    public string SettingsFilePath => _settingsFilePath;
+
     public string DatabasePath { get; set; }
     public string GamePath { get; set; }
     
@@ -53,16 +57,27 @@ public class SettingsService
         Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath) ?? throw new InvalidOperationException());
         if (!File.Exists(_settingsFilePath))
             return;
-        var json = File.ReadAllText(_settingsFilePath);
-        var savedSettings = JsonConvert.DeserializeObject<SettingsService>(json);
+
+        SettingsService? savedSettings;
+        try
+        {
+            var json = File.ReadAllText(_settingsFilePath);
+            savedSettings = JsonConvert.DeserializeObject<SettingsService>(json);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Failed to load settings ({e.Message}); using default values.");
+            return;
+        }
 
         if (savedSettings == null)
         {
             Console.WriteLine("Failed to load settings using default values.");
+            return;
         }
-            
-        DatabasePath = savedSettings.DatabasePath;
-        GamePath = savedSettings.GamePath;
+
+        DatabasePath = savedSettings.DatabasePath ?? DatabasePath;
+        GamePath = savedSettings.GamePath ?? GamePath;
         EnableMods = savedSettings.EnableMods;
         MaxSectorDepth = savedSettings.MaxSectorDepth;
         MinimumActorHashMatchRate = savedSettings.MinimumActorHashMatchRate;

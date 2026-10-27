@@ -1,0 +1,538 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
+        xmlns:vm="using:SectorRemovalUpdater.Gui.ViewModels"
+        xmlns:svc="using:SectorRemovalUpdater.Services"
+        x:Class="SectorRemovalUpdater.Gui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        mc:Ignorable="d"
+        d:DesignWidth="1120"
+        d:DesignHeight="820"
+        Title="Sector Removal Updater"
+        Width="1120"
+        Height="820"
+        MinWidth="920"
+        MinHeight="660"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/icon.png">
+
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0"
+                Background="{DynamicResource HeaderBackgroundBrush}"
+                BorderBrush="{DynamicResource CardBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="22,14">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="h1" Text="Sector Removal Updater" />
+                    <TextBlock Classes="subtle" Text="{Binding StatusMessage}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="14"
+                            VerticalAlignment="Center">
+                    <ProgressBar Width="130"
+                                 Height="5"
+                                 IsVisible="{Binding IsBusy}"
+                                 IsIndeterminate="{Binding !IsReleaseDownloading}"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ReleaseDownloadProgress}"
+                                 VerticalAlignment="Center" />
+                    <ToggleButton x:Name="ThemeToggle"
+                                  Checked="ThemeToggle_Changed"
+                                  Unchecked="ThemeToggle_Changed"
+                                  ToolTip.Tip="Toggle dark mode">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <i:Icon Value="fa-solid fa-moon" />
+                            <TextBlock Text="Dark mode" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" RowDefinitions="*,6,250" Margin="20,14,20,16">
+            <TabControl Grid.Row="0"
+                        IsEnabled="{Binding IsNotBusy}"
+                        Padding="0,8,0,0">
+
+                <TabItem Header="Update file">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="14" Margin="0,8,0,0">
+                            <Border Classes="card">
+                                <StackPanel Spacing="9">
+                                    <TextBlock Classes="sectionTitle" Text="ArchiveXL file" />
+                                    <TextBlock Classes="subtle"
+                                               Text="Choose the removal file you want to update. ArchiveXL JSON and YAML files are supported." />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Text="{Binding InputPath, Mode=TwoWay}"
+                                                 Watermark="Path to an .xl, .xl.json, .json, .yaml or .yml file" />
+                                        <Button Grid.Column="1"
+                                                Click="BrowseInput_Click"
+                                                Margin="8,0,0,0"
+                                                ToolTip.Tip="Browse ArchiveXL file...">
+                                            <i:Icon Value="fa-solid fa-folder-open" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="9">
+                                    <TextBlock Classes="sectionTitle" Text="Output file" />
+                                    <TextBlock Classes="subtle"
+                                               Text="The result is written here. The original file is left untouched." />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Text="{Binding OutputPath, Mode=TwoWay}"
+                                                 Watermark="Path of the updated ArchiveXL file" />
+                                        <Button Grid.Column="1"
+                                                Click="BrowseOutput_Click"
+                                                Margin="8,0,0,0"
+                                                ToolTip.Tip="Browse output file...">
+                                            <i:Icon Value="fa-solid fa-folder-open" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="sectionTitle" Text="Game versions" />
+                                        <Button Grid.Column="1"
+                                                Command="{Binding ReloadVersionsCommand}"
+                                                Padding="10,4"
+                                                ToolTip.Tip="Refresh game versions">
+                                            <i:Icon Value="fa-solid fa-arrows-rotate" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Classes="subtle"
+                                               Text="Pick the version the file was made for and the version you want to update it to." />
+                                    <Grid ColumnDefinitions="*,Auto,*">
+                                        <StackPanel>
+                                            <TextBlock Classes="label" Text="Source version" />
+                                            <ComboBox ItemsSource="{Binding Versions}"
+                                                      SelectedItem="{Binding SelectedSourceVersion, Mode=TwoWay}"
+                                                      PlaceholderText="Select a version"
+                                                      HorizontalAlignment="Stretch" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Command="{Binding SwapVersionsCommand}"
+                                                Margin="10,0,10,0"
+                                                VerticalAlignment="Bottom"
+                                                ToolTip.Tip="Swap source and target versions">
+                                            <i:Icon Value="fa-solid fa-right-left" />
+                                        </Button>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Classes="label" Text="Target version" />
+                                            <ComboBox ItemsSource="{Binding Versions}"
+                                                      SelectedItem="{Binding SelectedTargetVersion, Mode=TwoWay}"
+                                                      PlaceholderText="Select a version"
+                                                      HorizontalAlignment="Stretch" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border IsVisible="{Binding HasNoVersions}"
+                                            Background="{DynamicResource WarningBackgroundBrush}"
+                                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="11,8">
+                                        <TextBlock TextWrapping="Wrap"
+                                                   Text="No database versions are loaded yet. Open the Hashes &amp; Database tab to build the hashes or load a precompiled database." />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Button Classes="accent"
+                                            Command="{Binding UpdateFileCommand}"
+                                            Padding="22,10">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <i:Icon Value="fa-solid fa-file-pen" />
+                                            <TextBlock Text="Update file" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Grid.Column="1"
+                                               Classes="subtle"
+                                               Margin="14,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="Runs the same update logic as the command-line version." />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Hashes &amp; Database">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="14" Margin="0,8,0,0">
+                            <Border Classes="card">
+                                <StackPanel Spacing="9">
+                                    <TextBlock Classes="sectionTitle" Text="Hash database" />
+                                    <TextBlock Classes="subtle" Text="{Binding DatabaseSummary}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Command="{Binding ReloadVersionsCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <i:Icon Value="fa-solid fa-arrows-rotate" />
+                                                <TextBlock Text="Refresh" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="LoadDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <i:Icon Value="fa-solid fa-file-import" />
+                                                <TextBlock Text="Load from file..." VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="SaveDatabase_Click">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <i:Icon Value="fa-solid fa-file-export" />
+                                                <TextBlock Text="Save version to file..." VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Command="{Binding OpenDatabaseFolderCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <i:Icon Value="fa-solid fa-folder-open" />
+                                                <TextBlock Text="Open folder" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="sectionTitle" Text="Precompiled hash databases" />
+                                        <Button Grid.Column="1"
+                                                Command="{Binding RefreshReleaseAssetsCommand}"
+                                                Padding="10,4"
+                                                ToolTip.Tip="Refresh list">
+                                            <i:Icon Value="fa-solid fa-arrows-rotate" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Classes="subtle"
+                                               TextWrapping="Wrap"
+                                               Text="Download a hash database from the PrecompiledBinaries GitHub release and import it directly. The downloaded .bin file is deleted after it has been imported." />
+                                    <ComboBox ItemsSource="{Binding ReleaseAssets}"
+                                              SelectedItem="{Binding SelectedReleaseAsset, Mode=TwoWay}"
+                                              PlaceholderText="Select a precompiled database"
+                                              HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="svc:ReleaseAsset">
+                                                <TextBlock Text="{Binding DisplayName}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Button Classes="accent"
+                                                Command="{Binding DownloadReleaseAssetCommand}"
+                                                Padding="18,8">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <i:Icon Value="fa-solid fa-cloud-arrow-down" />
+                                                <TextBlock Text="Download and load" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="subtle"
+                                                   Margin="12,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding ReleaseStatus}" />
+                                    </Grid>
+                                    <ProgressBar IsVisible="{Binding IsReleaseDownloading}"
+                                                 Minimum="0"
+                                                 Maximum="100"
+                                                 Value="{Binding ReleaseDownloadProgress}"
+                                                 Height="6" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="sectionTitle" Text="Build hashes from the game" />
+                                    <TextBlock Classes="subtle"
+                                               TextWrapping="Wrap"
+                                               Text="Reads the installed game archives and creates a hash database for the detected game version. Building from scratch can take several minutes." />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="label" Text="Game folder" />
+                                            <TextBlock Classes="monoSmall"
+                                                       Text="{Binding GamePathDisplay}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="subtle" Text="{Binding GamePathStatus}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Classes="accent"
+                                                Command="{Binding BuildHashesCommand}"
+                                                Margin="14,0,0,0"
+                                                VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <i:Icon Value="fa-solid fa-hammer" />
+                                                <TextBlock Text="Build hashes" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <Grid ColumnDefinitions="2*,3*">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="sectionTitle" Text="Loaded versions" />
+                                        <ListBox ItemsSource="{Binding Versions}"
+                                                 SelectedItem="{Binding SelectedDatabaseVersion, Mode=TwoWay}"
+                                                 Height="190"
+                                                 Background="Transparent">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <TextBlock Text="{Binding}" Padding="4,2" />
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Classes="statPanel" Margin="16,0,0,0">
+                                        <StackPanel Spacing="5" VerticalAlignment="Center">
+                                            <TextBlock Classes="label" Text="Selected version" />
+                                            <TextBlock Classes="statValue" Text="{Binding SelectedVersionDisplay}" />
+                                            <TextBlock Classes="subtle" Text="{Binding VersionStats}" />
+                                            <TextBlock Classes="subtle"
+                                                       TextWrapping="Wrap"
+                                                       Text="Saving a version writes a portable .bin file that other machines can load without rebuilding the hashes." />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Settings">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="14" Margin="0,8,0,0">
+                            <Border Classes="card">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="sectionTitle" Text="Paths" />
+
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Classes="label" Text="Cyberpunk 2077 game folder" />
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBox Text="{Binding GamePath, Mode=TwoWay}"
+                                                     Watermark="Folder containing bin/x64/Cyberpunk2077.exe" />
+                                            <Button Grid.Column="1"
+                                                    Click="BrowseGameFolder_Click"
+                                                    Margin="8,0,0,0"
+                                                    ToolTip.Tip="Browse Cyberpunk 2077 installation folder...">
+                                                <i:Icon Value="fa-solid fa-folder-open" />
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock Classes="subtle" Text="{Binding GamePathStatus}" />
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Classes="label" Text="Hash database folder" />
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBox Text="{Binding DatabasePath, Mode=TwoWay}"
+                                                     Watermark="Folder used for the local LMDB hash database" />
+                                            <Button Grid.Column="1"
+                                                    Click="BrowseDatabaseFolder_Click"
+                                                    Margin="8,0,0,0"
+                                                    ToolTip.Tip="Browse hash database folder...">
+                                                <i:Icon Value="fa-solid fa-folder-open" />
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock Classes="subtle"
+                                                   Text="Shared with the command-line version. Changing this folder reopens the database when you save." />
+                                    </StackPanel>
+
+                                    <Button Command="{Binding OpenDataFolderCommand}"
+                                            HorizontalAlignment="Left">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <i:Icon Value="fa-solid fa-folder-open" />
+                                            <TextBlock Text="Open settings folder" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="14">
+                                    <TextBlock Classes="sectionTitle" Text="Matching options" />
+
+                                    <CheckBox Content="Include mod archives when building hashes"
+                                              IsChecked="{Binding EnableMods, Mode=TwoWay}" />
+                                    <CheckBox Content="Verbose logging"
+                                              IsChecked="{Binding VerboseLogging, Mode=TwoWay}" />
+
+                                    <Grid ColumnDefinitions="*,170">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Classes="label" Text="Maximum neighbouring sector depth" />
+                                            <TextBlock Classes="subtle"
+                                                       Text="How many neighbouring sectors to search when a node moves." />
+                                        </StackPanel>
+                                        <NumericUpDown Grid.Column="1"
+                                                       Value="{Binding MaxSectorDepth, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="10"
+                                                       Increment="1"
+                                                       FormatString="0"
+                                                       HorizontalAlignment="Stretch" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="*,170">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Classes="label" Text="Minimum actor hash match rate" />
+                                            <TextBlock Classes="subtle"
+                                                       TextWrapping="Wrap"
+                                                       Text="0.90 means 90% of instanced or collision actors must match. Lower values find more nodes but risk false positives." />
+                                        </StackPanel>
+                                        <NumericUpDown Grid.Column="1"
+                                                       Value="{Binding MinimumActorHashMatchRate, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="1"
+                                                       Increment="0.05"
+                                                       FormatString="0.00"
+                                                       HorizontalAlignment="Stretch" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Button Classes="accent"
+                                            Command="{Binding SaveSettingsCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <i:Icon Value="fa-solid fa-floppy-disk" />
+                                            <TextBlock Text="Save settings" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Grid.Column="1"
+                                               Classes="subtle"
+                                               Margin="14,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="Settings are stored in your user profile and shared with the command-line version." />
+                                </Grid>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="sectionTitle" Text="About this build" />
+                                    <TextBlock Classes="monoSmall" Text="{Binding AppVersion}" />
+                                    <TextBlock Classes="subtle" Text="{Binding PlatformText}" />
+                                    <TextBlock Classes="subtle"
+                                               TextWrapping="Wrap"
+                                               Text="The GUI runs on Windows, macOS and Linux. The game installation itself must be reachable from this machine, for example through a Wine or Proton prefix." />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+
+            <GridSplitter Grid.Row="1"
+                          Height="6"
+                          HorizontalAlignment="Stretch"
+                          Background="Transparent"
+                          ResizeDirection="Rows"
+                          ResizeBehavior="PreviousAndNext" />
+
+            <ThemeVariantScope Grid.Row="2" RequestedThemeVariant="Dark">
+                <Border Classes="logCard">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,8,12,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Classes="sectionTitle" Text="Activity log" Foreground="#E6EDF7" />
+                                <Border Classes="badge">
+                                    <TextBlock Classes="badgeText" Text="{Binding LogCountText}" />
+                                </Border>
+                            </StackPanel>
+                            <CheckBox Grid.Column="1"
+                                      Content="Auto-scroll"
+                                      IsChecked="{Binding AutoScroll, Mode=TwoWay}"
+                                      HorizontalAlignment="Right"
+                                      Margin="0,0,12,0" />
+                            <Button Grid.Column="2"
+                                    Click="CopyLog_Click"
+                                    Padding="10,4"
+                                    ToolTip.Tip="Copy log">
+                                <i:Icon Value="fa-solid fa-copy" />
+                            </Button>
+                            <Button Grid.Column="3"
+                                    Click="SaveLog_Click"
+                                    Padding="10,4"
+                                    Margin="8,0"
+                                    ToolTip.Tip="Save log to file...">
+                                <i:Icon Value="fa-solid fa-floppy-disk" />
+                            </Button>
+                            <Button Grid.Column="4"
+                                    Command="{Binding ClearLogCommand}"
+                                    Padding="10,4"
+                                    ToolTip.Tip="Clear activity log">
+                                <i:Icon Value="fa-solid fa-trash-can" />
+                            </Button>
+                        </Grid>
+                        <Grid Grid.Row="1" Margin="8,0,8,8">
+                            <Border Background="Transparent">
+                                <ListBox x:Name="LogList"
+                                         Classes="logList"
+                                         ItemsSource="{Binding LogEntries}"
+                                         SelectionMode="Single">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:LogEntry">
+                                            <TextBlock Classes="logLine"
+                                                       Classes.error="{Binding IsError}"
+                                                       Classes.warning="{Binding IsWarning}"
+                                                       Classes.success="{Binding IsSuccess}"
+                                                       Text="{Binding Display}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                            <TextBlock Text="No activity yet."
+                                       IsVisible="{Binding !HasLogEntries}"
+                                       Foreground="#6F8199"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Grid>
+                </Border>
+            </ThemeVariantScope>
+        </Grid>
+
+        <Border Grid.RowSpan="2"
+                IsVisible="{Binding IsConfirmCloseVisible}"
+                Background="#99000000"
+                ZIndex="100">
+            <Border Classes="dialog"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="sectionTitle" Text="An operation is still running" />
+                        <TextBlock Classes="subtle"
+                                   TextWrapping="Wrap"
+                                   Text="Closing now can interrupt the database build or leave an output file incomplete. Keep the app open until the operation finishes, or close anyway if you are sure." />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Command="{Binding CancelCloseConfirmationCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <i:Icon Value="fa-solid fa-arrow-left" />
+                                <TextBlock Text="Keep working" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="danger"
+                                Click="CloseAnyway_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <i:Icon Value="fa-solid fa-xmark" />
+                                <TextBlock Text="Close anyway" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

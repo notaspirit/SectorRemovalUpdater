@@ -64,10 +64,15 @@ public class WolvenKitWrapper
         }
     }
     /// <summary>
+    /// True when the wrapper has been initialized.
+    /// </summary>
+    public static bool IsInitialized => instance != null;
+
+    /// <summary>
     /// Get the current Instance
     /// </summary>
     /// <exception cref="ArgumentException">if wrapper is not initialized</exception>
-    public static WolvenKitWrapper? Instance
+    public static WolvenKitWrapper Instance
     {
         get
         {

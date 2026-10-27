@@ -1,0 +1,188 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Styles.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F3F5F9" />
+                    <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#E1E6EF" />
+                    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#5E6B7E" />
+                    <SolidColorBrush x:Key="AccentBrush" Color="#2F6FED" />
+                    <SolidColorBrush x:Key="AccentHoverBrush" Color="#245CCB" />
+                    <SolidColorBrush x:Key="AccentPressedBrush" Color="#1D4CA8" />
+                    <SolidColorBrush x:Key="DangerBrush" Color="#C63636" />
+                    <SolidColorBrush x:Key="DangerHoverBrush" Color="#A92B2B" />
+                    <SolidColorBrush x:Key="BadgeBackgroundBrush" Color="#EDF2FF" />
+                    <SolidColorBrush x:Key="BadgeTextBrush" Color="#2F5CB8" />
+                    <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFF7E5" />
+                    <SolidColorBrush x:Key="WarningBorderBrush" Color="#F2D18B" />
+                    <SolidColorBrush x:Key="StatPanelBackgroundBrush" Color="#F7F9FC" />
+                    <SolidColorBrush x:Key="LogCardBackgroundBrush" Color="#0E141E" />
+                    <SolidColorBrush x:Key="LogBorderBrush" Color="#202C3D" />
+                    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#FFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0D121A" />
+                    <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="#141B25" />
+                    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#141B25" />
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#243143" />
+                    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#9AA8BC" />
+                    <SolidColorBrush x:Key="AccentBrush" Color="#4C8DFF" />
+                    <SolidColorBrush x:Key="AccentHoverBrush" Color="#6BA1FF" />
+                    <SolidColorBrush x:Key="AccentPressedBrush" Color="#3D77DB" />
+                    <SolidColorBrush x:Key="DangerBrush" Color="#D9534F" />
+                    <SolidColorBrush x:Key="DangerHoverBrush" Color="#E86C68" />
+                    <SolidColorBrush x:Key="BadgeBackgroundBrush" Color="#1B2942" />
+                    <SolidColorBrush x:Key="BadgeTextBrush" Color="#9CC0FF" />
+                    <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#332B17" />
+                    <SolidColorBrush x:Key="WarningBorderBrush" Color="#6B5621" />
+                    <SolidColorBrush x:Key="StatPanelBackgroundBrush" Color="#101823" />
+                    <SolidColorBrush x:Key="LogCardBackgroundBrush" Color="#0A0F16" />
+                    <SolidColorBrush x:Key="LogBorderBrush" Color="#1E2A3A" />
+                    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#17202C" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.h1">
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="TextBlock.sectionTitle">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+    </Style>
+
+    <Style Selector="TextBlock.subtle">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.monoSmall">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.statValue">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style Selector="Border.statPanel">
+        <Setter Property="Background" Value="{DynamicResource StatPanelBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <Style Selector="Border.logCard">
+        <Setter Property="Background" Value="{DynamicResource LogCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LogBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+    </Style>
+
+    <Style Selector="Border.dialog">
+        <Setter Property="Background" Value="{DynamicResource DialogBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="22" />
+        <Setter Property="MaxWidth" Value="470" />
+    </Style>
+
+    <Style Selector="Border.badge">
+        <Setter Property="Background" Value="{DynamicResource BadgeBackgroundBrush}" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Padding" Value="8,1" />
+    </Style>
+
+    <Style Selector="TextBlock.badgeText">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource BadgeTextBrush}" />
+    </Style>
+
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="18,8" />
+    </Style>
+
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.accent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.danger">
+        <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="18,8" />
+    </Style>
+
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource DangerHoverBrush}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="ListBox.logList">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <Style Selector="ListBox.logList ListBoxItem">
+        <Setter Property="Padding" Value="8,1" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style Selector="TextBlock.logLine">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="#D6E0EE" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.logLine.error">
+        <Setter Property="Foreground" Value="#FF8A80" />
+    </Style>
+
+    <Style Selector="TextBlock.logLine.warning">
+        <Setter Property="Foreground" Value="#F3CC62" />
+    </Style>
+
+    <Style Selector="TextBlock.logLine.success">
+        <Setter Property="Foreground" Value="#7EE787" />
+    </Style>
+</Styles>

@@ -1,0 +1,135 @@
+name: Build and Draft Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.project }} for ${{ matrix.runtime }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CLI
+          - os: windows-latest
+            project: SectorRemovalUpdater
+            runtime: win-x64
+            artifact_name: SectorRemovalUpdater-win-x64
+            archive_ext: zip
+          - os: ubuntu-latest
+            project: SectorRemovalUpdater
+            runtime: linux-x64
+            artifact_name: SectorRemovalUpdater-linux-x64
+            archive_ext: tar.gz
+          - os: macos-latest
+            project: SectorRemovalUpdater
+            runtime: osx-x64
+            artifact_name: SectorRemovalUpdater-osx-x64
+            archive_ext: tar.gz
+          - os: macos-latest
+            project: SectorRemovalUpdater
+            runtime: osx-arm64
+            artifact_name: SectorRemovalUpdater-osx-arm64
+            archive_ext: tar.gz
+          # GUI
+          - os: windows-latest
+            project: SectorRemovalUpdater.Gui
+            runtime: win-x64
+            artifact_name: SectorRemovalUpdater.Gui-win-x64
+            archive_ext: zip
+          - os: ubuntu-latest
+            project: SectorRemovalUpdater.Gui
+            runtime: linux-x64
+            artifact_name: SectorRemovalUpdater.Gui-linux-x64
+            archive_ext: tar.gz
+          - os: macos-latest
+            project: SectorRemovalUpdater.Gui
+            runtime: osx-x64
+            artifact_name: SectorRemovalUpdater.Gui-osx-x64
+            archive_ext: tar.gz
+          - os: macos-latest
+            project: SectorRemovalUpdater.Gui
+            runtime: osx-arm64
+            artifact_name: SectorRemovalUpdater.Gui-osx-arm64
+            archive_ext: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: >
+          dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj
+          -c Release
+          -r ${{ matrix.runtime }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o publish/${{ matrix.runtime }}
+
+      - name: Make executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x publish/${{ matrix.runtime }}/${{ matrix.project }} || true
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "publish/${{ matrix.runtime }}/*" -DestinationPath "${{ matrix.artifact_name }}.zip"
+
+      - name: Archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tar -czf "${{ matrix.artifact_name }}.tar.gz" -C "publish/${{ matrix.runtime }}" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.${{ matrix.archive_ext }}
+          if-no-files-found: error
+
+  release:
+    name: Create Draft Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} dist/ \;
+          ls -lh dist/
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
